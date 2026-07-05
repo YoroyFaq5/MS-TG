@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Added — Этап 6, инкремент 8: турниры (только просмотр)
+
+- `bot/api_client/endpoints/tournaments.py`, `presenters/tournaments.py`,
+  `handlers/tournaments.py` — `/tournaments [pending|active|finished]`,
+  `/tournament <id>`. Без привязки аккаунта (публичные данные).
+- 54 юнит-теста (было 45, +9). Проверено кросс-процессно против
+  реального MS: список показывает засеянный турнир, детали — верное
+  название активной стадии и винрейты игроков.
+
 ### Added — Этап 6, инкремент 7: рейтинг/история/экономика/достижения/титулы
 
 - `bot/api_client/endpoints/{ratings,history,economy,achievements}.py` —
