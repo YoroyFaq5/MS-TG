@@ -75,7 +75,19 @@ class ApiClient:
 
         if not resp.content:
             return None
-        return resp.json()
+        body = resp.json()
+        # MS оборачивает все ответы в {"status": "ok"/"error", "message",
+        # "data"} — разворачиваем здесь один раз, чтобы endpoints/* и
+        # presenters/* работали с самими данными, не с конвертом. Ошибки
+        # уровня HTTP уже отловлены выше по коду статуса; status="error"
+        # с кодом 200 в этом API не встречается (см. app/routes/api_bot.py
+        # — _fail всегда передаёт свой HTTP-код), но на всякий случай
+        # тоже поднимаем ApiError, а не отдаём вызывающему коду мусор.
+        if isinstance(body, dict) and "status" in body and "data" in body:
+            if body["status"] != "ok":
+                raise ApiError(body.get("message", "Unknown API error"))
+            return body["data"]
+        return body
 
     def get(self, path: str, params: Optional[dict] = None) -> Any:
         return self._request("GET", path, params=params)

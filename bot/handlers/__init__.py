@@ -4,3 +4,5 @@
 bot.telegram_bot — сам этот файл импортируется один раз в create_app().
 """
 from bot.handlers import start  # noqa: F401
+from bot.handlers import profile  # noqa: F401
+from bot.handlers import compare  # noqa: F401
