@@ -134,9 +134,10 @@ touch WSGI-файла) — тот же проверенный паттерн, ч
 | Нужно на основном сайте | Для какой фичи бота | Статус |
 |---|---|---|
 | `Player.telegram_id` + Login Widget | Привязка аккаунта, `/resolve` | ✅ Готово (MS commit `98e6db1`) |
-| `Game.round_number` + `TournamentService.generate_next_round()` | Авторассадка следующего раунда | ✅ Готово (MS commit `ea0fe90`) — уведомление ещё не отправляется, см. ниже |
+| `Game.round_number` + `TournamentService.generate_next_round()` | Авторассадка следующего раунда | ✅ Готово (MS commit `ea0fe90`) |
+| `BotNotifyService` + `INCOMING_EVENT_SECRET`/`BOT_EVENTS_URL` — событие `next-slot` | Уведомление "Твой слот — N" | ✅ Готово (MS commit `4d081fd`, бот `e57405b`) |
 | `/api/v1/bot/*` (профиль, статистика, рейтинг, история, экономика, достижения, титулы, турниры, fantasy) | Все основные разделы меню | Не начато |
-| Fire-and-forget вызовы в существующем сервисном коде + `BOT_EVENTS_URL`/`INCOMING_EVENT_SECRET` | Все проактивные уведомления (в т.ч. "твой следующий слот") | Не начато |
+| Остальные fire-and-forget события (завершение игры, достижение/титул, перекуп Mythic/Ultra, fantasy, подарок, сезонная награда) | Остальные проактивные уведомления | Не начато — `next-slot` уже готовый шаблон для них |
 
 Готовность `Player.telegram_id`/Login Widget означает: как только на
 стороне сайта появится `/api/v1/bot/resolve`, бот сможет реально
@@ -144,13 +145,20 @@ touch WSGI-файла) — тот же проверенный паттерн, ч
 вызову архитектурно, самого метода-обёртки под конкретный эндпоинт ещё
 нет — появится вместе с этим эндпоинтом).
 
-Готовность авторассадки означает: `generate_next_round` уже считает и
-возвращает (`ServiceResult.data`) всё нужное для уведомления — `assignments`
-(player_id/game_id/table_number/seat_number/round_number на каждого) и
-`resting_player_ids` — но пока никуда их не отправляет. Следующий шаг —
-добавить вызов `POST <BOT_EVENTS_URL>/events/next-slot` (с HMAC-подписью
-`INCOMING_EVENT_SECRET`) прямо там, где на MS уже вызывается
-`generate_next_round` (`games.py::finish_game`).
+Готовность авторассадки означает: `generate_next_round` считает и
+возвращает (`ServiceResult.data`) всё нужное для уведомления —
+`assignments` (player_id/game_id/table_number/seat_number/round_number на
+каждого) и `resting_player_ids`.
+
+Готовность `next-slot`-события означает: `finish_game` на MS уже реально
+шлёт его боту сразу после `generate_next_round` (`app/services/
+bot_notify_service.py::BotNotifyService.send_event`), а
+`bot/webhooks/events.py::dispatch` уже реально его обрабатывает и шлёт
+"Твой слот — N" через `TeleBot.send_message` — весь путь end-to-end
+рабочий и проверен между двумя реально запущенными серверами. Остальные
+типы событий (см. таблицу выше) используют тот же `BotNotifyService` +
+тот же `EVENT_HANDLERS`-реестр — `next-slot` теперь готовый шаблон для
+них, а не то, что нужно проектировать с нуля.
 
 Каждый пункт реализуется отдельным согласованным инкрементом на стороне
 основного репозитория (MS), не здесь.
