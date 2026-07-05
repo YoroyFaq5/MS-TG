@@ -7,7 +7,7 @@
 #   bash deploy.sh
 set -euo pipefail
 
-WSGI_FILE="/var/www/<замените>_pythonanywhere_com_wsgi.py"
+WSGI_FILE="/var/www/no1an_pythonanywhere_com_wsgi.py"
 
 cd "$(dirname "$0")"
 
