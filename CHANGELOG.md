@@ -2,13 +2,36 @@
 
 ## [Unreleased]
 
+### Added — Этап 6, инкремент 6: бот подключён к /api/v1/bot/*
+
+- `bot/api_client/client.py` — разворачивает конверт MS
+  `{status,message,data}`, `ApiError` при `status != "ok"`.
+- `bot/api_client/endpoints/profile.py` (`resolve`/`get_profile`/
+  `get_stats`/`compare`), `endpoints/account.py` (`unlink`) — тонкие
+  типизированные обёртки, без логики.
+- `bot/services/linking_service.py` — общее правило "не привязан —
+  предложи привязать" для всех хендлеров, которым нужен конкретный игрок.
+- `bot/presenters/profile.py` (`build_not_linked_message`,
+  `build_welcome_back_message`, `build_profile_card`),
+  `presenters/stats.py`, `presenters/compare.py` — чистые функции.
+- `bot/handlers/start.py` (переписан) — `/start` реально резолвит
+  вызывающего. Новые `handlers/profile.py` (`/me`, `/stats`),
+  `handlers/compare.py` (`/compare <id>`). Каждый хендлер ловит `ApiError`
+  и отвечает дружелюбным текстом.
+- Удалён устаревший `presenters/start.py` (статичное сообщение "бот в
+  разработке" — больше не нужно, есть реальные данные).
+- 30 юнит-тестов (было 13): пресентеры — чистые функции; хендлеры —
+  с моками `resolve`/API-вызовов/`send_message`.
+- Проверено кросс-процессно: реальный бот-процесс на :5001 вызывает
+  реальный MS-процесс на :5000 через `ApiClient` — resolve, profile,
+  stats, compare, unlink дали корректный, осмысленный текст.
+
 ### Зависимость закрыта (изменение на стороне MS, не в этом репозитории)
 
 - Первая партия `/api/v1/bot/*` реализована на MS (`resolve`, `profile`,
   `stats`, `compare`, `account/unlink`, commit `e6af578`) — авторизация
-  серверным bearer-токеном, версионировано. Бот пока не вызывает ничего
-  из этого — `bot/api_client/` не имеет методов под эти эндпоинты,
-  `/start` всё ещё отвечает статичным текстом. Это следующий инкремент.
+  серверным bearer-токеном, версионировано. Теперь полностью подключена
+  к боту (см. "Added" выше).
 
 ### Added — Этап 6, инкремент 4: обработка next-slot событий
 
