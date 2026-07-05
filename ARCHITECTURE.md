@@ -134,16 +134,23 @@ touch WSGI-файла) — тот же проверенный паттерн, ч
 | Нужно на основном сайте | Для какой фичи бота | Статус |
 |---|---|---|
 | `Player.telegram_id` + Login Widget | Привязка аккаунта, `/resolve` | ✅ Готово (MS commit `98e6db1`) |
+| `Game.round_number` + `TournamentService.generate_next_round()` | Авторассадка следующего раунда | ✅ Готово (MS commit `ea0fe90`) — уведомление ещё не отправляется, см. ниже |
 | `/api/v1/bot/*` (профиль, статистика, рейтинг, история, экономика, достижения, титулы, турниры, fantasy) | Все основные разделы меню | Не начато |
-| `Game.round_number` | Определение "раунд стадии завершён" | Не начато |
-| `TournamentService.generate_next_round()` (алгоритм рассадки) | Авторассадка следующего раунда | Не начато |
-| Fire-and-forget вызовы в существующем сервисном коде + `BOT_EVENTS_URL`/`INCOMING_EVENT_SECRET` | Все проактивные уведомления | Не начато |
+| Fire-and-forget вызовы в существующем сервисном коде + `BOT_EVENTS_URL`/`INCOMING_EVENT_SECRET` | Все проактивные уведомления (в т.ч. "твой следующий слот") | Не начато |
 
 Готовность `Player.telegram_id`/Login Widget означает: как только на
 стороне сайта появится `/api/v1/bot/resolve`, бот сможет реально
 резолвить `telegram_id → player_id` (сейчас `ApiClient` уже готов к этому
 вызову архитектурно, самого метода-обёртки под конкретный эндпоинт ещё
 нет — появится вместе с этим эндпоинтом).
+
+Готовность авторассадки означает: `generate_next_round` уже считает и
+возвращает (`ServiceResult.data`) всё нужное для уведомления — `assignments`
+(player_id/game_id/table_number/seat_number/round_number на каждого) и
+`resting_player_ids` — но пока никуда их не отправляет. Следующий шаг —
+добавить вызов `POST <BOT_EVENTS_URL>/events/next-slot` (с HMAC-подписью
+`INCOMING_EVENT_SECRET`) прямо там, где на MS уже вызывается
+`generate_next_round` (`games.py::finish_game`).
 
 Каждый пункт реализуется отдельным согласованным инкрементом на стороне
 основного репозитория (MS), не здесь.
