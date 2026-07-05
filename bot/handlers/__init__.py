@@ -13,3 +13,4 @@ from bot.handlers import achievements  # noqa: F401
 from bot.handlers import tournaments  # noqa: F401
 from bot.handlers import fantasy  # noqa: F401
 from bot.handlers import account  # noqa: F401
+from bot.handlers import inline  # noqa: F401

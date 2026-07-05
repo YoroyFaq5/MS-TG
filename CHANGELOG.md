@@ -2,6 +2,58 @@
 
 ## [Unreleased]
 
+### Added — Полировка: инлайн-режим (`@bot Имя`)
+
+- `bot/api_client/endpoints/players.py` (`search_players`) — тонкая
+  обёртка над новым `GET /api/v1/bot/players/search?q=` (MS commit
+  `b57f00c`, переиспользует существующий `PlayerSearchService`).
+- `bot/presenters/players.py` (`build_inline_results`) — по одному
+  `InlineQueryResultArticle` на игрока (заголовок/ELO), без похода за
+  полной карточкой профиля на кандидата — инлайн-запрос должен успевать
+  ответить на каждое нажатие клавиши.
+- `bot/handlers/inline.py` (`@bot.inline_handler`) — пустой запрос и
+  `ApiError` оба тихо отвечают пустым списком результатов, не падая.
+- 5 новых юнит-тестов (было 105, стало 110).
+- Проверено кросс-процессно: синтетический `inline_query`-апдейт через
+  реальный вебхук → реальный вызов `GET /api/v1/bot/players/search` на
+  MS (виден в логе MS, 200, вернул засеянного игрока) → корректно
+  собранный `answerInlineQuery` с HTML-текстом карточки; единственная
+  ожидаемая ошибка — `401` от настоящего Telegram API (используется
+  заведомо фиктивный токен), поймана, HTTP-ответ вебхука всё равно `200`.
+
+### Added — Полировка: остальные 7 fire-and-forget событий
+
+- `bot/presenters/notifications.py` — добавлены
+  `build_achievement_granted_message`, `build_title_granted_message`,
+  `build_item_bought_out_message`, `build_fantasy_result_message`,
+  `build_fantasy_prize_message`, `build_gift_received_message`,
+  `build_season_award_message`, `build_game_finished_message`.
+- `bot/webhooks/events.py` — `_make_simple_handler(builder)`-фабрика для
+  всех 8 типов событий с одним получателем (в отличие от `next-slot`,
+  который рассылает списку игроков).
+- На стороне MS (commit `a905b21`): `AchievementService.unlock`,
+  `TitleService.grant_title`, `ShopService.buyout_item`,
+  `GiftService.send_gift`, `FantasyService.score_tournament` (два
+  события — результат и приз) и `EconomyService.apply_season_rewards`
+  теперь вызывают `BotNotifyService.notify_player(...)` после
+  соответствующего бизнес-события.
+- Проверено кросс-процессно все 8 типов событий одним прогоном через
+  фейковый "event receiver" на :5002 — верные payload и верный
+  `telegram_id`-адресат на каждый, включая `season-award`, отдельно
+  сработавший для победителя и для не-победителя из top-10 в одном
+  вызове `apply_season_rewards`.
+
+### Added — Полировка: команда `/unlink`
+
+- `bot/presenters/account.py` (`build_unlink_confirm_message`,
+  `build_unlink_done_message`, `build_unlink_cancelled_message`) —
+  Inline-клавиатура Да/Отмена вместо немедленного действия.
+- `bot/handlers/account.py` — `handle_unlink` (сообщение) и
+  `handle_unlink_callback` (первый `@bot.callback_query_handler` в
+  проекте) — реально вызывает `account/unlink`.
+- Проверено кросс-процессно синтетическим `callback_query`-апдейтом
+  через реальный вебхук.
+
 ### Added — Этап 6, инкремент 9: Fantasy (последний крупный раздел меню)
 
 - `bot/api_client/endpoints/fantasy.py`, `presenters/fantasy.py`,
