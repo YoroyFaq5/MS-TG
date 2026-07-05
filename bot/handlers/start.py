@@ -4,6 +4,7 @@ from bot.telegram_bot import bot, api_client
 from bot.api_client.exceptions import ApiError
 from bot.api_client.endpoints.profile import resolve
 from bot.presenters.profile import build_not_linked_message, build_welcome_back_message
+from bot.presenters.menu import build_main_menu_markup
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ def handle_start(message) -> None:
         return
 
     if data.get("linked"):
-        text, markup = build_welcome_back_message(data["display_name"])
+        text, _ = build_welcome_back_message(data["display_name"])
     else:
-        text, markup = build_not_linked_message()
-    bot.send_message(message.chat.id, text, reply_markup=markup)
+        text, _ = build_not_linked_message()
+    bot.send_message(message.chat.id, text, reply_markup=build_main_menu_markup())

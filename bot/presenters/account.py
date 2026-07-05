@@ -23,3 +23,11 @@ def build_unlink_done_message() -> Tuple[str, Optional[types.InlineKeyboardMarku
 
 def build_unlink_cancelled_message() -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:
     return "Отменено — аккаунт остаётся привязан.", None
+
+
+def build_account_status_message(display_name: str) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:
+    text = (
+        f"⚙️ Привязан аккаунт: <b>{display_name}</b>.\n\n"
+        "/unlink — отвязать Telegram от сайта."
+    )
+    return text, None

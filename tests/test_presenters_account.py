@@ -1,5 +1,6 @@
 from bot.presenters.account import (
     build_unlink_confirm_message, build_unlink_done_message, build_unlink_cancelled_message,
+    build_account_status_message,
 )
 
 
@@ -20,4 +21,11 @@ def test_build_unlink_done_message():
 def test_build_unlink_cancelled_message():
     text, markup = build_unlink_cancelled_message()
     assert "Отменено" in text
+    assert markup is None
+
+
+def test_build_account_status_message():
+    text, markup = build_account_status_message("Alice")
+    assert "Alice" in text
+    assert "/unlink" in text
     assert markup is None
