@@ -53,6 +53,16 @@ class ApiClient:
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
 
+    @staticmethod
+    def _extract_error_message(resp) -> Optional[str]:
+        try:
+            body = resp.json()
+        except ValueError:
+            return resp.text[:200] or None
+        if isinstance(body, dict) and body.get("message"):
+            return body["message"]
+        return resp.text[:200] or None
+
     def _request(self, method: str, path: str, **kwargs) -> Any:
         url = f"{self.base_url}{path}"
         try:
@@ -64,14 +74,20 @@ class ApiClient:
             logger.warning("API network error: %s %s — %s", method, path, e)
             raise ApiError(str(e)) from e
 
-        if resp.status_code == 401 or resp.status_code == 403:
-            raise ApiUnauthorized(f"{method} {path} -> {resp.status_code}")
-        if resp.status_code == 404:
-            raise ApiNotFound(f"{method} {path} -> 404")
-        if resp.status_code >= 500:
-            raise ApiServerError(f"{method} {path} -> {resp.status_code}")
         if resp.status_code >= 400:
-            raise ApiError(f"{method} {path} -> {resp.status_code}: {resp.text[:200]}")
+            # MS кладёт человекочитаемое сообщение business-логики в JSON
+            # {"status":"error","message":...} даже для 4xx (см. api_bot.py
+            # _fail) — вытаскиваем именно его, а не сырой текст ответа,
+            # иначе пользователь в Telegram увидел бы кусок JSON вместо
+            # "уже есть драфт для этого турнира".
+            message = self._extract_error_message(resp) or f"{method} {path} -> {resp.status_code}"
+            if resp.status_code in (401, 403):
+                raise ApiUnauthorized(message)
+            if resp.status_code == 404:
+                raise ApiNotFound(message)
+            if resp.status_code >= 500:
+                raise ApiServerError(message)
+            raise ApiError(message)
 
         if not resp.content:
             return None

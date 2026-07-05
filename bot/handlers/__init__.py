@@ -11,3 +11,4 @@ from bot.handlers import history  # noqa: F401
 from bot.handlers import economy  # noqa: F401
 from bot.handlers import achievements  # noqa: F401
 from bot.handlers import tournaments  # noqa: F401
+from bot.handlers import fantasy  # noqa: F401
