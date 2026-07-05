@@ -61,9 +61,17 @@ def create_app(config_name: str = "default"):
         signature = request.headers.get("X-Signature")
         if not verify_event_signature(request.get_data(), signature, cfg.INCOMING_EVENT_SECRET):
             abort(403)
-        # Обработка конкретных типов событий (game-finished, next-slot,
-        # achievement-granted, ...) добавляется по мере готовности
-        # соответствующих фич на стороне основного сайта.
-        return jsonify(ok=True, event_type=event_type, handled=False), 501
+        from bot.webhooks.events import dispatch
+
+        payload = request.get_json(force=True, silent=True) or {}
+        try:
+            handled = dispatch(event_type, payload)
+        except Exception:
+            # Сбой обработки события не должен возвращать 500 — сайт,
+            # приславший событие, не должен ничего "чинить" на своей
+            # стороне из-за временной проблемы у бота.
+            logger.exception("Ошибка обработки события %s", event_type)
+            return jsonify(ok=False, event_type=event_type), 200
+        return jsonify(ok=True, event_type=event_type, handled=handled), (200 if handled else 501)
 
     return app
