@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Зависимость закрыта (изменение на стороне MS, не в этом репозитории)
+
+- `Player.telegram_id` + Telegram Login Widget реализованы на основном
+  сайте (MS, commit `98e6db1`) — кнопка привязки в профиле, HMAC-проверка
+  подписи виджета, роуты `/auth/telegram/callback`/`/auth/telegram/unlink`.
+  Для бота это означает: как только на MS появится
+  `GET /api/v1/bot/resolve?telegram_id=`, `/start` сможет реально
+  резолвить пользователя вместо статичного приветствия.
+
 ### Added — Этап 6, инкремент 1: каркас проекта
 
 - Структура каталогов (`bot/handlers`, `presenters`, `services`,
