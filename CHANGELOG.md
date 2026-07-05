@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Added — Этап 6, инкремент 7: рейтинг/история/экономика/достижения/титулы
+
+- `bot/api_client/endpoints/{ratings,history,economy,achievements}.py` —
+  тонкие обёртки над второй партией MS-эндпоинтов.
+- `bot/presenters/{ratings,history,economy,achievements}.py` — чистые
+  функции форматирования.
+- `bot/handlers/{ratings,history,economy,achievements}.py` — команды
+  `/rating [страница]`, `/history [страница]`, `/balance` (баланс +
+  последние 5 операций одним сообщением), `/achievements`,
+  `/pin <id>`/`/unpin <id>`, `/titles`.
+- 45 юнит-тестов (было 30, +15 новых).
+- Проверено кросс-процессно против реального MS: все семь новых
+  эндпоинтов, включая pin→unpin, реально переключающий флаг на сервере.
+
 ### Added — Этап 6, инкремент 6: бот подключён к /api/v1/bot/*
 
 - `bot/api_client/client.py` — разворачивает конверт MS
