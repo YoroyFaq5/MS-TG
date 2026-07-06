@@ -15,9 +15,8 @@ def build_not_linked_message() -> Tuple[str, Optional[types.InlineKeyboardMarkup
 def build_welcome_back_message(display_name: str) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:
     text = (
         f"👋 С возвращением, <b>{display_name}</b>!\n\n"
-        "/me — профиль\n"
-        "/stats — статистика\n"
-        "/compare &lt;id игрока&gt; — сравнение"
+        "Пользуйся кнопками меню ниже — профиль, статистика, рейтинг и "
+        "«🆚 Кто круче», чтобы сравнить себя с другими игроками."
     )
     return text, None
 

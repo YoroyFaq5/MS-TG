@@ -9,13 +9,19 @@ def build_my_draft_message(draft: dict) -> Tuple[str, Optional[types.InlineKeybo
         f"Статус: {draft['status']} · Очки: {draft['total_points']}",
         "",
     ]
+    markup = None
     if draft["picks"]:
         lines.append("Пики:")
+        markup = types.InlineKeyboardMarkup()
         for p in draft["picks"]:
             lines.append(f"— {p['player_name']} ({p['points_earned']} очк.)")
+            markup.add(types.InlineKeyboardButton(
+                f"❌ {p['player_name']}",
+                callback_data=f"funpick:{draft['tournament_id']}:{p['player_id']}",
+            ))
     else:
         lines.append("Пока нет пиков.")
-    return "\n".join(lines), None
+    return "\n".join(lines), markup
 
 
 def build_no_draft_message(tournament_id: int) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:
@@ -30,11 +36,17 @@ def build_available_message(players: list, tournament_id: int) -> Tuple[str, Opt
     lines = [f"Доступные игроки для пика (турнир #{tournament_id}):", ""]
     for p in players:
         lines.append(f"#{p['id']} {p['name']} (ELO {round(p['elo'])})")
-    if not players:
+
+    markup = None
+    if players:
+        markup = types.InlineKeyboardMarkup()
+        for p in players:
+            markup.add(types.InlineKeyboardButton(
+                f"{p['name']} (ELO {round(p['elo'])})", callback_data=f"fpick:{tournament_id}:{p['id']}",
+            ))
+    else:
         lines.append("Никого не осталось.")
-    lines.append("")
-    lines.append(f"Выбрать: <code>/fantasy_pick {tournament_id} &lt;id игрока&gt;</code>")
-    return "\n".join(lines), None
+    return "\n".join(lines), markup
 
 
 def build_leaderboard_message(entries: list, tournament_id: int) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:

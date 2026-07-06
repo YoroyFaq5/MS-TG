@@ -12,7 +12,7 @@ def test_build_not_linked_message():
 def test_build_welcome_back_message():
     text, markup = build_welcome_back_message("Alice")
     assert "Alice" in text
-    assert "/me" in text
+    assert "Кто круче" in text
 
 
 def test_build_profile_card_basic():

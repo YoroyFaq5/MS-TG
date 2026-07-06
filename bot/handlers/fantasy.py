@@ -100,64 +100,30 @@ def handle_fantasy_available(message) -> None:
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
-@bot.message_handler(commands=["fantasy_pick"])
-def handle_fantasy_pick(message) -> None:
-    args = _parse_int_arg(message, min_args=2)
-    if not args:
-        bot.send_message(
-            message.chat.id,
-            "Использование: <code>/fantasy_pick &lt;id турнира&gt; &lt;id игрока&gt;</code>",
-        )
-        return
-    tournament_id, player_id = args
-    telegram_id = message.from_user.id
+@bot.callback_query_handler(func=lambda call: call.data.startswith(("fpick:", "funpick:")))
+def handle_fantasy_pick_callback(call) -> None:
+    action, tid, pid = call.data.split(":")
+    tournament_id, player_id = int(tid), int(pid)
+    telegram_id = call.from_user.id
 
     try:
-        if resolve_player_id(api_client, telegram_id) is None:
-            text, markup = build_not_linked_message()
-            bot.send_message(message.chat.id, text, reply_markup=markup)
-            return
         draft = get_my_draft(api_client, telegram_id, tournament_id)
-        add_pick(api_client, telegram_id, draft["id"], player_id)
+        if action == "fpick":
+            add_pick(api_client, telegram_id, draft["id"], player_id)
+            players = get_available(api_client, telegram_id, tournament_id)
+            text, markup = build_available_message(players, tournament_id)
+        else:
+            remove_pick(api_client, telegram_id, draft["id"], player_id)
+            draft = get_my_draft(api_client, telegram_id, tournament_id)
+            text, markup = build_my_draft_message(draft)
     except ApiNotFound:
         text, markup = build_no_draft_message(tournament_id)
-        bot.send_message(message.chat.id, text, reply_markup=markup)
-        return
     except ApiError as e:
-        bot.send_message(message.chat.id, f"⚠️ {e}")
+        bot.answer_callback_query(call.id, f"⚠️ {e}")
         return
 
-    bot.send_message(message.chat.id, "Игрок добавлен в драфт ✅")
-
-
-@bot.message_handler(commands=["fantasy_unpick"])
-def handle_fantasy_unpick(message) -> None:
-    args = _parse_int_arg(message, min_args=2)
-    if not args:
-        bot.send_message(
-            message.chat.id,
-            "Использование: <code>/fantasy_unpick &lt;id турнира&gt; &lt;id игрока&gt;</code>",
-        )
-        return
-    tournament_id, player_id = args
-    telegram_id = message.from_user.id
-
-    try:
-        if resolve_player_id(api_client, telegram_id) is None:
-            text, markup = build_not_linked_message()
-            bot.send_message(message.chat.id, text, reply_markup=markup)
-            return
-        draft = get_my_draft(api_client, telegram_id, tournament_id)
-        remove_pick(api_client, telegram_id, draft["id"], player_id)
-    except ApiNotFound:
-        text, markup = build_no_draft_message(tournament_id)
-        bot.send_message(message.chat.id, text, reply_markup=markup)
-        return
-    except ApiError as e:
-        bot.send_message(message.chat.id, f"⚠️ {e}")
-        return
-
-    bot.send_message(message.chat.id, "Игрок убран из драфта ✅")
+    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id, "Готово ✅")
 
 
 @bot.message_handler(commands=["fantasy_leaderboard"])

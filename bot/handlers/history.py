@@ -31,3 +31,20 @@ def handle_history(message) -> None:
 
     text, markup = build_history_message(data)
     bot.send_message(message.chat.id, text, reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("history:"))
+def handle_history_page_callback(call) -> None:
+    page = int(call.data.split(":", 1)[1])
+    telegram_id = call.from_user.id
+
+    try:
+        data = get_history(api_client, telegram_id, page=page, per_page=10)
+    except ApiError:
+        logger.exception("history page callback failed")
+        bot.answer_callback_query(call.id, "⚠️ Не удалось получить историю, попробуйте позже.")
+        return
+
+    text, markup = build_history_message(data)
+    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id)

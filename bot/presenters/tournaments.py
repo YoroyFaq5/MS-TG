@@ -13,9 +13,16 @@ def build_tournaments_list_message(data: dict) -> Tuple[str, Optional[types.Inli
         lines.append(f"#{t['id']} {icon} {t['name']} ({t['status']})")
     if not items:
         lines.append("Турниров пока нет.")
-    lines.append("")
-    lines.append("Детали: <code>/tournament &lt;id&gt;</code>")
-    return "\n".join(lines), None
+
+    markup = None
+    if items:
+        markup = types.InlineKeyboardMarkup()
+        for t in items:
+            icon = STATUS_ICONS.get(t["status"], "")
+            markup.add(types.InlineKeyboardButton(
+                f"{icon} {t['name']}", callback_data=f"tourn:{t['id']}",
+            ))
+    return "\n".join(lines), markup
 
 
 def build_tournament_detail_message(data: dict) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:

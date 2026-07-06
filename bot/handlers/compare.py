@@ -4,7 +4,7 @@ from bot.telegram_bot import bot, api_client
 from bot.api_client.exceptions import ApiError, ApiNotFound
 from bot.api_client.endpoints.profile import compare
 from bot.presenters.profile import build_not_linked_message
-from bot.presenters.compare import build_compare_message
+from bot.presenters.vs import build_vs_message
 from bot.services.linking_service import resolve_player_id
 
 logger = logging.getLogger(__name__)
@@ -36,5 +36,5 @@ def handle_compare(message) -> None:
         bot.send_message(message.chat.id, "⚠️ Не удалось сравнить, попробуйте позже.")
         return
 
-    text, markup = build_compare_message(data)
+    text, markup = build_vs_message(data)
     bot.send_message(message.chat.id, text, reply_markup=markup)

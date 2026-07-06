@@ -11,9 +11,17 @@ def build_achievements_message(items: list) -> Tuple[str, Optional[types.InlineK
         lines.append(f"#{a['id']} {a['name']}{pin_mark} — {a['description']}")
     if not unlocked:
         lines.append("Пока нет открытых достижений.")
-    lines.append("")
-    lines.append("/pin &lt;id&gt; — закрепить, /unpin &lt;id&gt; — открепить")
-    return "\n".join(lines), None
+
+    markup = None
+    if unlocked:
+        markup = types.InlineKeyboardMarkup()
+        for a in unlocked:
+            if a.get("pinned"):
+                label, action = f"📤 Открепить «{a['name']}»", "unpin"
+            else:
+                label, action = f"📌 Закрепить «{a['name']}»", "pin"
+            markup.add(types.InlineKeyboardButton(label, callback_data=f"ach:{action}:{a['id']}"))
+    return "\n".join(lines), markup
 
 
 def build_titles_message(items: list) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:

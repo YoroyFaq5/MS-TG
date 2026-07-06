@@ -83,6 +83,15 @@ def test_menu_fantasy_sends_help_text():
     assert "Турниры" in text
 
 
+def test_menu_vs_delegates_to_handle_vs_menu():
+    from bot.handlers.menu import menu_vs
+
+    message = _fake_message(text="🆚 Кто круче")
+    with patch("bot.handlers.menu.handle_vs_menu") as mock_handle:
+        menu_vs(message)
+    mock_handle.assert_called_once_with(message)
+
+
 def test_menu_account_not_linked():
     from bot.handlers.menu import menu_account
 

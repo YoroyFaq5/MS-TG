@@ -24,3 +24,19 @@ def handle_rating(message) -> None:
 
     text, markup = build_ratings_message(data, scope="global")
     bot.send_message(message.chat.id, text, reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("rating:"))
+def handle_rating_page_callback(call) -> None:
+    page = int(call.data.split(":", 1)[1])
+
+    try:
+        data = get_ratings(api_client, scope="global", page=page, per_page=10)
+    except ApiError:
+        logger.exception("rating page callback failed")
+        bot.answer_callback_query(call.id, "⚠️ Не удалось получить рейтинг, попробуйте позже.")
+        return
+
+    text, markup = build_ratings_message(data, scope="global")
+    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id)

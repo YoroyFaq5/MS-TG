@@ -12,6 +12,7 @@ from bot.handlers.history import handle_history
 from bot.handlers.economy import handle_balance
 from bot.handlers.achievements import handle_achievements
 from bot.handlers.tournaments import handle_tournaments
+from bot.handlers.vs import handle_vs_menu
 
 logger = logging.getLogger(__name__)
 
@@ -19,10 +20,8 @@ _FANTASY_HELP_TEXT = (
     "🎯 <b>Fantasy</b>\n\n"
     "Узнайте ID турнира в разделе 🎮 Турниры, затем:\n"
     "/fantasy &lt;id&gt; — мой драфт\n"
-    "/fantasy_available &lt;id&gt; — доступные игроки\n"
+    "/fantasy_available &lt;id&gt; — доступные игроки (выбор/снятие — кнопками)\n"
     "/fantasy_create &lt;id&gt; — создать драфт\n"
-    "/fantasy_pick &lt;id&gt; &lt;игрок&gt; — выбрать игрока\n"
-    "/fantasy_unpick &lt;id&gt; &lt;игрок&gt; — снять игрока\n"
     "/fantasy_leaderboard &lt;id&gt; — таблица лидеров"
 )
 
@@ -65,6 +64,11 @@ def menu_tournaments(message) -> None:
 @bot.message_handler(func=lambda m: m.text == "🎯 Fantasy")
 def menu_fantasy(message) -> None:
     bot.send_message(message.chat.id, _FANTASY_HELP_TEXT)
+
+
+@bot.message_handler(func=lambda m: m.text == "🆚 Кто круче")
+def menu_vs(message) -> None:
+    handle_vs_menu(message)
 
 
 @bot.message_handler(func=lambda m: m.text == "⚙️ Аккаунт")

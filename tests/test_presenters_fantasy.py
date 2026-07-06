@@ -7,12 +7,14 @@ from bot.presenters.fantasy import (
 def test_build_my_draft_message_with_picks():
     draft = {
         "tournament_id": 3, "status": "open", "total_points": 12.5,
-        "picks": [{"player_name": "Alice", "points_earned": 5.0}],
+        "picks": [{"player_id": 9, "player_name": "Alice", "points_earned": 5.0}],
     }
     text, markup = build_my_draft_message(draft)
     assert "Alice" in text
     assert "12.5" in text
-    assert markup is None
+    buttons = [b for row in markup.keyboard for b in row]
+    assert len(buttons) == 1
+    assert buttons[0].callback_data == "funpick:3:9"
 
 
 def test_build_my_draft_message_no_picks():
@@ -28,9 +30,11 @@ def test_build_no_draft_message():
 
 def test_build_available_message():
     players = [{"id": 5, "name": "Bob", "elo": 1000.4}]
-    text, _ = build_available_message(players, 3)
+    text, markup = build_available_message(players, 3)
     assert "Bob" in text
-    assert "/fantasy_pick 3" in text
+    buttons = [b for row in markup.keyboard for b in row]
+    assert len(buttons) == 1
+    assert buttons[0].callback_data == "fpick:3:5"
 
 
 def test_build_available_message_empty():

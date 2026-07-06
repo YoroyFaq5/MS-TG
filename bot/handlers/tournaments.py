@@ -26,23 +26,20 @@ def handle_tournaments(message) -> None:
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
-@bot.message_handler(commands=["tournament"])
-def handle_tournament_detail(message) -> None:
-    parts = (message.text or "").split(maxsplit=1)
-    if len(parts) < 2 or not parts[1].strip().isdigit():
-        bot.send_message(message.chat.id, "Использование: <code>/tournament &lt;id&gt;</code>")
-        return
-    tournament_id = int(parts[1].strip())
+@bot.callback_query_handler(func=lambda call: call.data.startswith("tourn:"))
+def handle_tournament_detail_callback(call) -> None:
+    tournament_id = int(call.data.split(":", 1)[1])
 
     try:
         data = get_tournament_detail(api_client, tournament_id)
     except ApiNotFound:
-        bot.send_message(message.chat.id, "Турнир не найден.")
+        bot.answer_callback_query(call.id, "Турнир не найден.")
         return
     except ApiError:
-        logger.exception("/tournament failed")
-        bot.send_message(message.chat.id, "⚠️ Не удалось получить турнир, попробуйте позже.")
+        logger.exception("tournament detail callback failed")
+        bot.answer_callback_query(call.id, "⚠️ Не удалось получить турнир, попробуйте позже.")
         return
 
     text, markup = build_tournament_detail_message(data)
-    bot.send_message(message.chat.id, text, reply_markup=markup)
+    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id)

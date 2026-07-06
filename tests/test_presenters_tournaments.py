@@ -6,7 +6,9 @@ def test_build_tournaments_list_message():
     text, markup = build_tournaments_list_message(data)
     assert "Test Cup" in text
     assert "#1" in text
-    assert markup is None
+    buttons = [b for row in markup.keyboard for b in row]
+    assert len(buttons) == 1
+    assert buttons[0].callback_data == "tourn:1"
 
 
 def test_build_tournaments_list_message_empty():

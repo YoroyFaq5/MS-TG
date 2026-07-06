@@ -28,36 +28,24 @@ def handle_achievements(message) -> None:
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
-def _pin_or_unpin(message, action) -> None:
-    telegram_id = message.from_user.id
-    parts = (message.text or "").split(maxsplit=1)
-    if len(parts) < 2 or not parts[1].strip().isdigit():
-        bot.send_message(message.chat.id, "Использование: <code>/pin &lt;id достижения&gt;</code>")
-        return
-    achievement_id = int(parts[1].strip())
+@bot.callback_query_handler(func=lambda call: call.data.startswith("ach:"))
+def handle_achievement_toggle_callback(call) -> None:
+    _, action, achievement_id = call.data.split(":", 2)
+    achievement_id = int(achievement_id)
+    telegram_id = call.from_user.id
+    action_fn = pin if action == "pin" else unpin
 
     try:
-        if resolve_player_id(api_client, telegram_id) is None:
-            text, markup = build_not_linked_message()
-            bot.send_message(message.chat.id, text, reply_markup=markup)
-            return
-        action(api_client, telegram_id, achievement_id)
+        action_fn(api_client, telegram_id, achievement_id)
+        items = get_achievements(api_client, telegram_id)
     except ApiError:
-        logger.exception("pin/unpin failed")
-        bot.send_message(message.chat.id, "⚠️ Не удалось выполнить действие, попробуйте позже.")
+        logger.exception("achievement pin/unpin toggle failed")
+        bot.answer_callback_query(call.id, "⚠️ Не удалось выполнить действие, попробуйте позже.")
         return
 
-    bot.send_message(message.chat.id, "Готово ✅")
-
-
-@bot.message_handler(commands=["pin"])
-def handle_pin(message) -> None:
-    _pin_or_unpin(message, pin)
-
-
-@bot.message_handler(commands=["unpin"])
-def handle_unpin(message) -> None:
-    _pin_or_unpin(message, unpin)
+    text, markup = build_achievements_message(items)
+    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id, "Готово ✅")
 
 
 @bot.message_handler(commands=["titles"])
