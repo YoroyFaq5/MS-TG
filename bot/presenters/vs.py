@@ -29,13 +29,26 @@ _STATS = [
 ]
 
 
+def _bar(val_a: float, val_b: float, width: int = 8) -> str:
+    total = val_a + val_b
+    left = width // 2 if total <= 0 else round(width * val_a / total)
+    left = max(0, min(width, left))
+    return "🟩" * left + "🟥" * (width - left)
+
+
+def _power_bar(points_a: int, points_b: int, total_stats: int) -> str:
+    ties = total_stats - points_a - points_b
+    return "🟩" * points_a + "🟥" * points_b + "⬜" * ties
+
+
 def _stat_line(label: str, val_a, val_b, fmt: str) -> Tuple[str, int, int]:
     a_str, b_str = fmt.format(val_a), fmt.format(val_b)
+    bar = _bar(val_a, val_b)
     if val_a > val_b:
-        return f"{label}: {a_str} 🏆 vs {b_str}", 1, 0
+        return f"{label}: {a_str} 🏆  {bar}  {b_str}", 1, 0
     if val_b > val_a:
-        return f"{label}: {a_str} vs {b_str} 🏆", 0, 1
-    return f"{label}: {a_str} vs {b_str}", 0, 0
+        return f"{label}: {a_str}  {bar}  {b_str} 🏆", 0, 1
+    return f"{label}: {a_str}  {bar}  {b_str}", 0, 0
 
 
 def build_vs_picker_message(items: List[dict], self_player_id: int) -> Tuple[str, types.InlineKeyboardMarkup]:
@@ -61,6 +74,7 @@ def build_vs_message(data: dict) -> Tuple[str, Optional[types.InlineKeyboardMark
 
     lines: List[str] = [f"🆚 <b>{name_a}</b> vs <b>{name_b}</b>", ""]
     points_a = points_b = 0
+    total_stats = 0
     for label, key, fmt in _STATS:
         val_a, val_b = sa.get(key), sb.get(key)
         if val_a is None or val_b is None:
@@ -69,9 +83,10 @@ def build_vs_message(data: dict) -> Tuple[str, Optional[types.InlineKeyboardMark
         lines.append(line)
         points_a += pa
         points_b += pb
+        total_stats += 1
 
     lines.append("")
-    lines.append(f"Счёт: {points_a}:{points_b}")
+    lines.append(f"💪 {_power_bar(points_a, points_b, total_stats)}  Счёт: {points_a}:{points_b}")
 
     h2h = data.get("head_to_head")
     if h2h:

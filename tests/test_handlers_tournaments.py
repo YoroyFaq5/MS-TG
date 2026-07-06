@@ -62,7 +62,7 @@ def test_handle_tournament_detail_callback_success():
     from bot.handlers.tournaments import handle_tournament_detail_callback
 
     data = {
-        "tournament": {"name": "Test Cup", "status": "active", "type": "individual"},
+        "tournament": {"id": 1, "name": "Test Cup", "status": "active", "type": "individual"},
         "participant_count": 10, "games_finished": 1, "games_total": 3,
         "active_stage": None, "player_ratings": [],
     }

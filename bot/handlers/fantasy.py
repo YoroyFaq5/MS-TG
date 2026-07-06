@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 from bot.telegram_bot import bot, api_client
 from bot.api_client.exceptions import ApiError, ApiNotFound
@@ -16,88 +15,68 @@ from bot.services.linking_service import resolve_player_id
 logger = logging.getLogger(__name__)
 
 
-def _parse_int_arg(message, min_args: int = 1) -> Optional[list]:
-    parts = (message.text or "").split()
-    args = parts[1:]
-    if len(args) < min_args or not all(a.isdigit() for a in args[:min_args]):
-        return None
-    return [int(a) for a in args[:min_args]]
-
-
-@bot.message_handler(commands=["fantasy"])
-def handle_fantasy(message) -> None:
-    args = _parse_int_arg(message)
-    if not args:
-        bot.send_message(message.chat.id, "Использование: <code>/fantasy &lt;id турнира&gt;</code>")
-        return
-    tournament_id = args[0]
-    telegram_id = message.from_user.id
+@bot.callback_query_handler(func=lambda call: call.data.startswith("fantasy_my:"))
+def handle_fantasy_my_callback(call) -> None:
+    tournament_id = int(call.data.split(":", 1)[1])
+    telegram_id = call.from_user.id
 
     try:
         if resolve_player_id(api_client, telegram_id) is None:
             text, markup = build_not_linked_message()
-            bot.send_message(message.chat.id, text, reply_markup=markup)
-            return
-        draft = get_my_draft(api_client, telegram_id, tournament_id)
-    except ApiNotFound:
-        text, markup = build_no_draft_message(tournament_id)
-        bot.send_message(message.chat.id, text, reply_markup=markup)
-        return
+        else:
+            try:
+                draft = get_my_draft(api_client, telegram_id, tournament_id)
+                text, markup = build_my_draft_message(draft)
+            except ApiNotFound:
+                text, markup = build_no_draft_message(tournament_id)
     except ApiError:
-        logger.exception("/fantasy failed")
-        bot.send_message(message.chat.id, "⚠️ Не удалось получить драфт, попробуйте позже.")
+        logger.exception("fantasy_my callback failed")
+        bot.answer_callback_query(call.id, "⚠️ Не удалось получить драфт, попробуйте позже.")
         return
 
-    text, markup = build_my_draft_message(draft)
-    bot.send_message(message.chat.id, text, reply_markup=markup)
+    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id)
 
 
-@bot.message_handler(commands=["fantasy_create"])
-def handle_fantasy_create(message) -> None:
-    args = _parse_int_arg(message)
-    if not args:
-        bot.send_message(message.chat.id, "Использование: <code>/fantasy_create &lt;id турнира&gt;</code>")
-        return
-    tournament_id = args[0]
-    telegram_id = message.from_user.id
+@bot.callback_query_handler(func=lambda call: call.data.startswith("fantasy_create:"))
+def handle_fantasy_create_callback(call) -> None:
+    tournament_id = int(call.data.split(":", 1)[1])
+    telegram_id = call.from_user.id
 
     try:
         if resolve_player_id(api_client, telegram_id) is None:
             text, markup = build_not_linked_message()
-            bot.send_message(message.chat.id, text, reply_markup=markup)
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+            bot.answer_callback_query(call.id)
             return
         create_draft(api_client, telegram_id, tournament_id)
-    except ApiError as e:
-        bot.send_message(message.chat.id, f"⚠️ {e}")
-        return
-
-    bot.send_message(
-        message.chat.id,
-        f"Драфт создан ✅ Доступные игроки: <code>/fantasy_available {tournament_id}</code>",
-    )
-
-
-@bot.message_handler(commands=["fantasy_available"])
-def handle_fantasy_available(message) -> None:
-    args = _parse_int_arg(message)
-    if not args:
-        bot.send_message(message.chat.id, "Использование: <code>/fantasy_available &lt;id турнира&gt;</code>")
-        return
-    tournament_id = args[0]
-    telegram_id = message.from_user.id
-
-    try:
-        if resolve_player_id(api_client, telegram_id) is None:
-            text, markup = build_not_linked_message()
-            bot.send_message(message.chat.id, text, reply_markup=markup)
-            return
         players = get_available(api_client, telegram_id, tournament_id)
     except ApiError as e:
-        bot.send_message(message.chat.id, f"⚠️ {e}")
+        bot.answer_callback_query(call.id, f"⚠️ {e}")
         return
 
     text, markup = build_available_message(players, tournament_id)
-    bot.send_message(message.chat.id, text, reply_markup=markup)
+    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id, "Драфт создан ✅")
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("fantasy_avail:"))
+def handle_fantasy_avail_callback(call) -> None:
+    tournament_id = int(call.data.split(":", 1)[1])
+    telegram_id = call.from_user.id
+
+    try:
+        if resolve_player_id(api_client, telegram_id) is None:
+            text, markup = build_not_linked_message()
+        else:
+            players = get_available(api_client, telegram_id, tournament_id)
+            text, markup = build_available_message(players, tournament_id)
+    except ApiError as e:
+        bot.answer_callback_query(call.id, f"⚠️ {e}")
+        return
+
+    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith(("fpick:", "funpick:")))
@@ -126,20 +105,17 @@ def handle_fantasy_pick_callback(call) -> None:
     bot.answer_callback_query(call.id, "Готово ✅")
 
 
-@bot.message_handler(commands=["fantasy_leaderboard"])
-def handle_fantasy_leaderboard(message) -> None:
-    args = _parse_int_arg(message)
-    if not args:
-        bot.send_message(message.chat.id, "Использование: <code>/fantasy_leaderboard &lt;id турнира&gt;</code>")
-        return
-    tournament_id = args[0]
+@bot.callback_query_handler(func=lambda call: call.data.startswith("fantasy_lb:"))
+def handle_fantasy_lb_callback(call) -> None:
+    tournament_id = int(call.data.split(":", 1)[1])
 
     try:
         entries = get_leaderboard(api_client, tournament_id)
     except ApiError:
-        logger.exception("/fantasy_leaderboard failed")
-        bot.send_message(message.chat.id, "⚠️ Не удалось получить лидерборд, попробуйте позже.")
+        logger.exception("fantasy_lb callback failed")
+        bot.answer_callback_query(call.id, "⚠️ Не удалось получить лидерборд, попробуйте позже.")
         return
 
     text, markup = build_leaderboard_message(entries, tournament_id)
-    bot.send_message(message.chat.id, text, reply_markup=markup)
+    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
+    bot.answer_callback_query(call.id)

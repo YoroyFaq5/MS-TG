@@ -25,11 +25,10 @@ def build_my_draft_message(draft: dict) -> Tuple[str, Optional[types.InlineKeybo
 
 
 def build_no_draft_message(tournament_id: int) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:
-    text = (
-        f"У вас ещё нет драфта для турнира #{tournament_id}.\n"
-        f"Создать: <code>/fantasy_create {tournament_id}</code>"
-    )
-    return text, None
+    text = f"У вас ещё нет драфта для турнира #{tournament_id}."
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("➕ Создать драфт", callback_data=f"fantasy_create:{tournament_id}"))
+    return text, markup
 
 
 def build_available_message(players: list, tournament_id: int) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:

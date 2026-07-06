@@ -18,7 +18,7 @@ def test_build_tournaments_list_message_empty():
 
 def test_build_tournament_detail_message():
     data = {
-        "tournament": {"name": "Test Cup", "status": "active", "type": "individual"},
+        "tournament": {"id": 1, "name": "Test Cup", "status": "active", "type": "individual"},
         "participant_count": 10,
         "games_finished": 1,
         "games_total": 3,
@@ -29,12 +29,14 @@ def test_build_tournament_detail_message():
     assert "Test Cup" in text
     assert "Group" in text
     assert "Alice" in text
-    assert markup is None
+    buttons = [b for row in markup.keyboard for b in row]
+    callback_datas = {b.callback_data for b in buttons}
+    assert callback_datas == {"fantasy_my:1", "fantasy_avail:1", "fantasy_lb:1"}
 
 
 def test_build_tournament_detail_message_no_active_stage():
     data = {
-        "tournament": {"name": "Finished Cup", "status": "finished", "type": "individual"},
+        "tournament": {"id": 2, "name": "Finished Cup", "status": "finished", "type": "individual"},
         "participant_count": 8,
         "games_finished": 5,
         "games_total": 5,

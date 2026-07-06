@@ -24,8 +24,11 @@ def test_build_my_draft_message_no_picks():
 
 
 def test_build_no_draft_message():
-    text, _ = build_no_draft_message(3)
-    assert "/fantasy_create 3" in text
+    text, markup = build_no_draft_message(3)
+    assert "#3" in text
+    buttons = [b for row in markup.keyboard for b in row]
+    assert len(buttons) == 1
+    assert buttons[0].callback_data == "fantasy_create:3"
 
 
 def test_build_available_message():

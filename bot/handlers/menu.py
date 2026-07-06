@@ -18,11 +18,8 @@ logger = logging.getLogger(__name__)
 
 _FANTASY_HELP_TEXT = (
     "🎯 <b>Fantasy</b>\n\n"
-    "Узнайте ID турнира в разделе 🎮 Турниры, затем:\n"
-    "/fantasy &lt;id&gt; — мой драфт\n"
-    "/fantasy_available &lt;id&gt; — доступные игроки (выбор/снятие — кнопками)\n"
-    "/fantasy_create &lt;id&gt; — создать драфт\n"
-    "/fantasy_leaderboard &lt;id&gt; — таблица лидеров"
+    "Открой 🎮 Турниры, выбери турнир — там будут кнопки «Мой драфт», "
+    "«Доступные» и «Fantasy-лидеры»."
 )
 
 

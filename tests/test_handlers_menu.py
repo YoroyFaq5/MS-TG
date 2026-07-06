@@ -79,7 +79,7 @@ def test_menu_fantasy_sends_help_text():
     with patch("bot.telegram_bot.bot.send_message") as mock_send:
         menu_fantasy(message)
     text = mock_send.call_args[0][1]
-    assert "/fantasy" in text
+    assert "Fantasy" in text
     assert "Турниры" in text
 
 

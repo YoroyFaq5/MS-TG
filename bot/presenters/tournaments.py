@@ -41,4 +41,12 @@ def build_tournament_detail_message(data: dict) -> Tuple[str, Optional[types.Inl
         lines.append("Топ игроков:")
         for r in ratings[:10]:
             lines.append(f"{r['rank']}. {r['display_name']} — {r['win_rate']}%")
-    return "\n".join(lines), None
+
+    tid = t["id"]
+    markup = types.InlineKeyboardMarkup()
+    markup.row(
+        types.InlineKeyboardButton("🎯 Мой драфт", callback_data=f"fantasy_my:{tid}"),
+        types.InlineKeyboardButton("📋 Доступные", callback_data=f"fantasy_avail:{tid}"),
+    )
+    markup.row(types.InlineKeyboardButton("🏆 Fantasy-лидеры", callback_data=f"fantasy_lb:{tid}"))
+    return "\n".join(lines), markup
