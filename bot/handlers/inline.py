@@ -85,9 +85,9 @@ def handle_inline_query(inline_query) -> None:
         return
 
     try:
-        players = search_players(api_client, query_text)
+        players = search_players(api_client, query_text, fast=True)
     except ApiError:
-        logger.exception("Inline player search failed")
+        logger.warning("Inline player search did not finish in time")
         _safe_answer_inline_query(inline_query.id, [])
         return
 
