@@ -73,3 +73,16 @@ def test_non_json_error_body_falls_back_to_raw_text():
         with pytest.raises(ApiError) as exc_info:
             client.get("/whatever")
     assert "plain text error" in str(exc_info.value)
+
+
+def test_fast_get_uses_fast_session_with_short_timeout_and_no_retries():
+    client = _make_client()
+    fake = _fake_response(200, {"status": "ok", "message": "ok", "data": {"foo": "bar"}})
+    with patch.object(client.session, "request") as slow_request, \
+         patch.object(client.fast_session, "request", return_value=fake) as fast_request:
+        result = client.get("/whatever", fast=True)
+
+    slow_request.assert_not_called()
+    fast_request.assert_called_once()
+    assert fast_request.call_args.kwargs["timeout"] == client._fast_timeout
+    assert result == {"foo": "bar"}

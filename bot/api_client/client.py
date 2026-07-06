@@ -38,9 +38,12 @@ class ApiClient:
         service_token: str,
         connect_timeout: float = 5.0,
         read_timeout: float = 10.0,
+        fast_connect_timeout: float = 2.0,
+        fast_read_timeout: float = 3.0,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self._timeout = (connect_timeout, read_timeout)
+        self._fast_timeout = (fast_connect_timeout, fast_read_timeout)
 
         self.session = requests.Session()
         self.session.headers["Authorization"] = f"Bearer {service_token}"
@@ -53,6 +56,17 @@ class ApiClient:
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
 
+        # Отдельная сессия без ретраев и с коротким таймаутом — для
+        # time-sensitive путей вроде инлайн-режима, где у Telegram есть
+        # жёсткий дедлайн на ответ (answer_inline_query): лучше быстро
+        # сдаться и откатиться на запасной вариант, чем тянуть с ретраями
+        # и в итоге получить "query is too old" от Telegram.
+        self.fast_session = requests.Session()
+        self.fast_session.headers["Authorization"] = f"Bearer {service_token}"
+        fast_adapter = HTTPAdapter(max_retries=Retry(total=0))
+        self.fast_session.mount("https://", fast_adapter)
+        self.fast_session.mount("http://", fast_adapter)
+
     @staticmethod
     def _extract_error_message(resp) -> Optional[str]:
         try:
@@ -63,10 +77,12 @@ class ApiClient:
             return body["message"]
         return resp.text[:200] or None
 
-    def _request(self, method: str, path: str, **kwargs) -> Any:
+    def _request(self, method: str, path: str, fast: bool = False, **kwargs) -> Any:
         url = f"{self.base_url}{path}"
+        session = self.fast_session if fast else self.session
+        timeout = self._fast_timeout if fast else self._timeout
         try:
-            resp = self.session.request(method, url, timeout=self._timeout, **kwargs)
+            resp = session.request(method, url, timeout=timeout, **kwargs)
         except requests.Timeout as e:
             logger.warning("API timeout: %s %s", method, path)
             raise ApiTimeout(str(e)) from e
@@ -105,8 +121,8 @@ class ApiClient:
             return body["data"]
         return body
 
-    def get(self, path: str, params: Optional[dict] = None) -> Any:
-        return self._request("GET", path, params=params)
+    def get(self, path: str, params: Optional[dict] = None, fast: bool = False) -> Any:
+        return self._request("GET", path, params=params, fast=fast)
 
     def post(self, path: str, json: Optional[dict] = None) -> Any:
         return self._request("POST", path, json=json)

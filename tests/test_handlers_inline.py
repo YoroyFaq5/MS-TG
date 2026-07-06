@@ -62,10 +62,14 @@ def test_handle_inline_query_vs_syntax_compares_two_players():
         "head_to_head": None,
     }
     query = _fake_inline_query(query="Alice vs Bob")
-    with patch("bot.handlers.inline.search_players", side_effect=[
-             [{"id": 1, "display_name": "Alice", "elo": 1100}],
-             [{"id": 2, "display_name": "Bob", "elo": 1000}],
-         ]), \
+
+    def fake_search(client, name, fast=False):
+        return {
+            "Alice": [{"id": 1, "display_name": "Alice", "elo": 1100}],
+            "Bob": [{"id": 2, "display_name": "Bob", "elo": 1000}],
+        }[name]
+
+    with patch("bot.handlers.inline.search_players", side_effect=fake_search), \
          patch("bot.handlers.inline.compare_players", return_value=compare_data) as mock_compare, \
          patch("bot.telegram_bot.bot.answer_inline_query") as mock_answer:
         handle_inline_query(query)
@@ -82,7 +86,13 @@ def test_handle_inline_query_vs_syntax_falls_back_when_name_not_found():
 
     query = _fake_inline_query(query="Ghost vs Bob")
     players = [{"id": 2, "display_name": "Bob", "elo": 1000}]
-    with patch("bot.handlers.inline.search_players", side_effect=[[], players, players]) as mock_search, \
+
+    def fake_search(client, name, fast=False):
+        if name == "Ghost":
+            return []
+        return players
+
+    with patch("bot.handlers.inline.search_players", side_effect=fake_search) as mock_search, \
          patch("bot.telegram_bot.bot.answer_inline_query") as mock_answer:
         handle_inline_query(query)
 
