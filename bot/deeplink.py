@@ -14,11 +14,18 @@ caller (handlers/start.py) falls back to the plain main menu in that case.
 Supported prefixes:
     g<game_id>              — a specific game's card
     t<tournament_id>        — a tournament (series-aware, same as tapping
-                               it from the list)
+                               it from the list — redirects to the series
+                               screen itself if this id turns out to wrap
+                               one, so this ALSO covers "series tournament"
+                               links without a separate prefix)
     ev<tournament_id>_<series_id> — one series-tournament evening
-    fd<tournament_id>       — Fantasy hub for a whole tournament
-    fs<tournament_id>_<series_id> — Fantasy hub for one series evening
+    fd<tournament_id>       — Fantasy hub for a whole tournament (paid)
+    fs<tournament_id>_<series_id> — Fantasy hub for one series evening (paid)
+    fdp<tournament_id>      — Fantasy hub, PRACTICE draft, whole tournament
+    fsp<tournament_id>_<series_id> — Fantasy hub, PRACTICE draft, one evening
     season<season_id>       — a season's rating table
+    shop                    — shop hub
+    item<item_id>           — a specific shop item's card
     gift                    — gifts inbox
 """
 from __future__ import annotations
@@ -38,7 +45,11 @@ _PATTERNS = {
     "evening": re.compile(rf"^ev{_INT}_{_INT}$"),
     "fantasy_tournament": re.compile(rf"^fd{_INT}$"),
     "fantasy_series": re.compile(rf"^fs{_INT}_{_INT}$"),
+    "fantasy_tournament_practice": re.compile(rf"^fdp{_INT}$"),
+    "fantasy_series_practice": re.compile(rf"^fsp{_INT}_{_INT}$"),
     "season": re.compile(rf"^season{_INT}$"),
+    "shop": re.compile(r"^shop$"),
+    "shop_item": re.compile(rf"^item{_INT}$"),
     "gift": re.compile(r"^gift$"),
 }
 
@@ -99,7 +110,7 @@ def _evening(tournament_id: int, series_id: int) -> Optional[Tuple[str, types.In
 
 
 def _fantasy(
-    tournament_id: int, telegram_id: int, series_id: int = 0,
+    tournament_id: int, telegram_id: int, series_id: int = 0, is_practice: bool = False,
 ) -> Optional[Tuple[str, types.InlineKeyboardMarkup]]:
     from bot.telegram_bot import api_client
     from bot.api_client.exceptions import ApiError, ApiNotFound
@@ -115,10 +126,10 @@ def _fantasy(
     draft = None
     if resolve_player_id(api_client, telegram_id) is not None:
         try:
-            draft = get_my_draft(api_client, telegram_id, tournament_id, series_id or None, False)
+            draft = get_my_draft(api_client, telegram_id, tournament_id, series_id or None, is_practice)
         except (ApiError, ApiNotFound):
             draft = None
-    return build_fantasy_hub_message(tournament_id, series_id, False, name, draft)
+    return build_fantasy_hub_message(tournament_id, series_id, is_practice, name, draft)
 
 
 def _season(season_id: int) -> Optional[Tuple[str, types.InlineKeyboardMarkup]]:
@@ -132,6 +143,24 @@ def _season(season_id: int) -> Optional[Tuple[str, types.InlineKeyboardMarkup]]:
     except ApiError:
         return None
     return build_season_detail_message(data)
+
+
+def _shop_hub() -> Tuple[str, types.InlineKeyboardMarkup]:
+    from bot.presenters.shop import build_shop_hub_message
+    return build_shop_hub_message()
+
+
+def _shop_item(item_id: int, telegram_id: int) -> Optional[Tuple[str, types.InlineKeyboardMarkup]]:
+    from bot.telegram_bot import api_client
+    from bot.api_client.exceptions import ApiError
+    from bot.api_client.endpoints.shop import get_item_detail
+    from bot.presenters.shop import build_shop_item_message
+
+    try:
+        item = get_item_detail(api_client, item_id, telegram_id)
+    except ApiError:
+        return None
+    return build_shop_item_message(item, item.get("category"))
 
 
 def _gift() -> Tuple[str, types.InlineKeyboardMarkup]:
@@ -167,9 +196,24 @@ def resolve_deep_link(payload: str, telegram_id: int) -> Optional[Tuple[str, typ
     if m:
         return _fantasy(int(m.group(1)), telegram_id, int(m.group(2)))
 
+    m = _PATTERNS["fantasy_tournament_practice"].match(payload)
+    if m:
+        return _fantasy(int(m.group(1)), telegram_id, is_practice=True)
+
+    m = _PATTERNS["fantasy_series_practice"].match(payload)
+    if m:
+        return _fantasy(int(m.group(1)), telegram_id, int(m.group(2)), is_practice=True)
+
     m = _PATTERNS["season"].match(payload)
     if m:
         return _season(int(m.group(1)))
+
+    if _PATTERNS["shop"].match(payload):
+        return _shop_hub()
+
+    m = _PATTERNS["shop_item"].match(payload)
+    if m:
+        return _shop_item(int(m.group(1)), telegram_id)
 
     logger.info("Unrecognized deep-link payload: %r", payload)
     return None
