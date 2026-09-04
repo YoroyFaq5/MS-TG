@@ -78,8 +78,10 @@ def test_handle_vs_callback_opponent_not_found():
     with patch("bot.services.linking_service.resolve", return_value={"linked": True, "player_id": 7}), \
          patch("bot.handlers.vs.compare", side_effect=ApiNotFound("nf")), \
          patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
-         patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
+         patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer, \
+         patch("bot.telegram_bot.bot.send_message") as mock_send:
         handle_vs_callback(call)
 
     mock_edit.assert_not_called()
     mock_answer.assert_called_once()
+    assert "не найден" in mock_send.call_args[0][1]

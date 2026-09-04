@@ -39,6 +39,13 @@ def handle_vs_menu(message) -> None:
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "vs", "hub"))
 @guarded_callback(bot)
 def handle_vs_hub_callback(call) -> None:
+    # Answer FIRST, before any network calls: Telegram's callback_query
+    # token has its own short validity window, separate from the overall
+    # webhook response deadline — answering only after resolve_player_id()
+    # + get_ratings() (two outbound HTTPS round trips) risks the query
+    # already being expired ("query is too old") by the time we get here,
+    # which silently drops the spinner with no feedback to the user.
+    bot.answer_callback_query(call.id)
     storage.clear_fsm_state(call.message.chat.id)
     telegram_id = call.from_user.id
     player_id = resolve_player_id(api_client, telegram_id)
@@ -48,16 +55,15 @@ def handle_vs_hub_callback(call) -> None:
         data = get_ratings(api_client, scope="global", page=1, per_page=8)
         text, markup = build_vs_picker_message(data["items"], player_id)
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "vs", "search"))
 @guarded_callback(bot)
 def handle_vs_search_start(call) -> None:
+    bot.answer_callback_query(call.id)
     storage.set_fsm_state(call.message.chat.id, SCENARIO, "await_query")
     text, markup = build_vs_search_prompt_message()
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 @bot.message_handler(
@@ -83,21 +89,23 @@ def handle_vs_search_text(message) -> None:
 @bot.callback_query_handler(func=lambda call: call.data.startswith("vs:"))
 @guarded_callback(bot)
 def handle_vs_callback(call) -> None:
+    # Answer FIRST — see handle_vs_hub_callback above for why: resolve_player_id()
+    # + compare() are two outbound HTTPS calls, and Telegram's callback_query
+    # token can expire before we'd otherwise get around to answering it.
+    bot.answer_callback_query(call.id)
     opponent_id = int(call.data.split(":", 1)[1])
     telegram_id = call.from_user.id
 
     player_id = resolve_player_id(api_client, telegram_id)
     if player_id is None:
         text, _ = build_not_linked_message()
-        bot.answer_callback_query(call.id)
         bot.send_message(call.message.chat.id, text)
         return
     try:
         data = compare(api_client, telegram_id, opponent_id)
     except ApiNotFound:
-        bot.answer_callback_query(call.id, "Игрок не найден.")
+        bot.send_message(call.message.chat.id, "Игрок не найден.")
         return
 
     text, markup = build_vs_message(data)
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
