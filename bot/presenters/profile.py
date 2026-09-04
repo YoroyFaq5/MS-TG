@@ -2,6 +2,8 @@ from typing import Optional, Tuple
 
 from telebot import types
 
+from bot.ui import esc
+
 
 def build_not_linked_message() -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:
     text = (
@@ -14,7 +16,7 @@ def build_not_linked_message() -> Tuple[str, Optional[types.InlineKeyboardMarkup
 
 def build_welcome_back_message(display_name: str) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:
     text = (
-        f"👋 С возвращением, <b>{display_name}</b>!\n\n"
+        f"👋 С возвращением, <b>{esc(display_name)}</b>!\n\n"
         "Пользуйся кнопками меню ниже — профиль, статистика, рейтинг и "
         "«🆚 Кто круче», чтобы сравнить себя с другими игроками."
     )
@@ -26,14 +28,14 @@ def build_profile_card(data: dict) -> Tuple[str, Optional[types.InlineKeyboardMa
     rank = data.get("global_rank")
     rank_text = f"#{rank}" if rank else "—"
     lines = [
-        f"👤 <b>{player['display_name']}</b>",
+        f"👤 <b>{esc(player['display_name'])}</b>",
         f"ELO: {round(data.get('elo', player['elo']))} · Место в рейтинге: {rank_text}",
         f"Игр: {data['total_games']} · Побед: {data['total_wins']} ({data['win_rate']}%)",
         f"Монет: {round(data.get('coins', 0.0), 2)}",
     ]
     equipped_title = data.get("equipped_title")
     if equipped_title:
-        lines.append(f"🏅 {equipped_title.get('name', '')}")
+        lines.append(f"🏅 {esc(equipped_title.get('name', ''))}")
     if data.get("bio"):
-        lines.append(f"\n<i>{data['bio']}</i>")
+        lines.append(f"\n<i>{esc(data['bio'])}</i>")
     return "\n".join(lines), None

@@ -43,41 +43,57 @@ def test_handle_unlink_shows_confirmation():
     assert markup is not None
 
 
-def test_handle_unlink_callback_cancel():
-    from bot.handlers.account import handle_unlink_callback
+def test_handle_unlink_confirm_screen_callback():
+    from bot.handlers.account import handle_unlink_confirm_screen
+    from bot.keyboards.nav import cb
 
-    call = _fake_callback("unlink_cancel")
+    call = _fake_callback(cb("account", "unlink-confirm"))
     with patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
          patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
-        handle_unlink_callback(call)
+        handle_unlink_confirm_screen(call)
+
+    assert "Отвязать" in mock_edit.call_args[0][0]
+    mock_answer.assert_called_once()
+
+
+def test_handle_unlink_no_shows_cancelled_message():
+    from bot.handlers.account import handle_unlink_no
+    from bot.keyboards.nav import cb
+
+    call = _fake_callback(cb("account", "unlink-no"))
+    with patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
+         patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
+        handle_unlink_no(call)
 
     assert "Отменено" in mock_edit.call_args[0][0]
     mock_answer.assert_called_once()
 
 
-def test_handle_unlink_callback_confirm():
-    from bot.handlers.account import handle_unlink_callback
+def test_handle_unlink_yes_confirms():
+    from bot.handlers.account import handle_unlink_yes
+    from bot.keyboards.nav import cb
 
-    call = _fake_callback("unlink_confirm")
+    call = _fake_callback(cb("account", "unlink-yes"))
     with patch("bot.handlers.account.unlink") as mock_unlink, \
          patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
          patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
-        handle_unlink_callback(call)
+        handle_unlink_yes(call)
 
     mock_unlink.assert_called_once_with(mock_unlink.call_args[0][0], 111)
     assert "отвязан" in mock_edit.call_args[0][0]
     mock_answer.assert_called_once()
 
 
-def test_handle_unlink_callback_confirm_api_error():
+def test_handle_unlink_yes_api_error():
     from bot.api_client.exceptions import ApiError
-    from bot.handlers.account import handle_unlink_callback
+    from bot.handlers.account import handle_unlink_yes
+    from bot.keyboards.nav import cb
 
-    call = _fake_callback("unlink_confirm")
+    call = _fake_callback(cb("account", "unlink-yes"))
     with patch("bot.handlers.account.unlink", side_effect=ApiError("boom")), \
          patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
          patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
-        handle_unlink_callback(call)
+        handle_unlink_yes(call)
 
     mock_edit.assert_not_called()
     mock_answer.assert_called_once()

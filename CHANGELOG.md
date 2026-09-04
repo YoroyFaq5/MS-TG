@@ -2,6 +2,132 @@
 
 ## [Unreleased]
 
+### Rewrite — MafiaTracker 2.0: full inline client, all remaining domains, security, outbox
+
+Supersedes every "Вся полировка завершена" claim below — that was true only
+for the command-based v1 client covering profile/stats/ratings/tournaments/
+Fantasy(basic)/compare. This pass replaces the navigation model entirely and
+fills in shop, inventory, gifts, notification settings, deep links, and a
+durable outbox on the MS side. See ARCHITECTURE.md for the full picture;
+summary of what changed:
+
+**Security (increment 1)**
+- Closed a real data leak: `GET /api/v1/bot/tournaments/<id>` on MS handed
+  out `player_ratings`/`team_ratings` regardless of `Tournament.hide_standings`.
+  Now mirrors the site's own `_can_view_standings` rule from a `telegram_id`
+  param (hidden unless the caller is an admin who isn't themselves a
+  participant) and returns `can_view_standings` explicitly.
+- MS's Bot API: constant-time service-token comparison (`hmac.compare_digest`),
+  a best-effort in-process rate limiter, and a request body size cap.
+- Bot side: matching in-process rate limiter + `MAX_CONTENT_LENGTH` on both
+  public endpoints (`/telegram/webhook/...`, `/events/<type>`).
+- `bot/ui.py::esc()` — every presenter that interpolates a site-supplied
+  string (display names, item/tournament/title names, gift notes, bios)
+  into HTML parse_mode text now escapes it. Previously none did.
+
+**Navigation shell (increment 2)**
+- Inline hierarchical main menu (`bot/presenters/menu.py`,
+  `bot/handlers/menu.py`) replaces the old flat Reply Keyboard — one
+  compact "🏠 Меню" button is the only Reply Keyboard left; everything else
+  edits the same message via inline keyboards. 9 sections per spec: Мой
+  кабинет, Рейтинги, Турниры, Fantasy, Магазин, Инвентарь, Подарки,
+  Сравнить игроков, Уведомления.
+- `bot/keyboards/nav.py` — versioned callback_data (`v1:domain:action:...`),
+  shared Home/Back footer, pagination row builder.
+- `bot/dispatch.py::guarded_callback` — every new-domain handler is wrapped:
+  swallows the pagination page-indicator no-op, rejects a double-tap on a
+  `sensitive=True` action (purchase/gift/draft) via a short-lived lock, and
+  guarantees exactly one `answer_callback_query` on any path a handler
+  didn't reach itself.
+- `bot/storage.py` — new local SQLite store (`bot/data/bot.db`, override via
+  `BOT_DB_PATH`) for FSM state, double-tap locks, outbox event dedup, and
+  per-category notification preferences. Chosen over Redis: this bot is a
+  single small webhook-model Flask app with no other infra already
+  running; SQLite needs zero new services and survives process restarts,
+  unlike an in-memory dict. Revisit if the bot ever needs multiple
+  concurrent app instances sharing this state.
+
+**Seasons, tournaments, series, game cards (increment 3)**
+- New MS endpoints: `/seasons/current`, `/seasons`, `/seasons/<id>`,
+  `/seasons/<id>/my-place`, `/seasons/winners`, `/series-tournaments`,
+  `/series-tournaments/<id>`, `/series-tournaments/<id>/series/<id>`,
+  `/series/<id>` (bare-id shortcut), `/games/<id>`, `/players/<id>`.
+- Bot: `handlers/seasons.py`, `handlers/games.py`, rewritten
+  `handlers/tournaments.py` (status+type filters, series-aware routing —
+  a series-wrapped tournament opens the series screen directly, never the
+  plain tournament UI) and matching presenters. "Моё место" card shows
+  games played, the top-5 games floor, points, GG, and the two nearest
+  rivals.
+
+**Fantasy (increment 4)**
+- MS Bot API now passes `tournament_series_id`/`is_practice` through on
+  every relevant endpoint (previously silently dropped), plus new
+  `/fantasy/events` (browse without knowing a tournament_id),
+  `/fantasy/history`, `/fantasy/draft/<id>/cancel`, `/fantasy/draft/<id>`.
+- Bot: full rewrite (`handlers/fantasy.py`, `presenters/fantasy.py`) around
+  a compact `(tournament_id, series_id, is_practice)` scope encoded in
+  callback_data — event picker, draft creation with confirmation, pick/
+  unpick, cancel-with-refund confirmation, paid/practice toggle, history
+  with pagination.
+
+**Shop, inventory, titles (increment 5)**
+- New MS endpoints: `/shop/items`, `/shop/items/<id>`,
+  `/shop/items/<id>/buy`, `/inventory`, `/inventory/<id>/equip`,
+  `/inventory/<id>/unequip`, `/titles/<id>/equip`, `/titles/unequip`.
+- Bot: `handlers/shop.py`, `handlers/inventory.py`, catalog with category
+  filters, item card with owned/locked state, buy confirmation + real
+  server-side re-check, inventory equip/unequip, title equip/unequip
+  wired onto the existing achievements/titles screen.
+
+**Gifts + FSM (increment 6)**
+- New MS endpoints: `/gifts/inbox`, `/gifts/history`,
+  `/gifts/giftable-items`, `/gifts/send`.
+- Bot: `handlers/gifts.py` — minimal FSM (state in `bot/storage.py`, keyed
+  by chat_id): pick item -> type recipient nickname -> pick from search
+  results -> optional note -> confirm -> send, cancel available at every
+  step. Self-gifting and gifting someone else's item are already rejected
+  server-side by `GiftService`.
+
+**Notification settings + outbox (increment 7)**
+- MS: `NotifyOutboxEvent` model + `NotifyOutboxService` (enqueue/drain with
+  exponential backoff, atomic per-row claiming safe under concurrent
+  workers) replaces `BotNotifyService`'s old synchronous "POST and hope" —
+  same public call sites, now durable. `flask outbox-drain` CLI command
+  for cron, optional in-process poller (`OUTBOX_WORKER_ENABLED=true`,
+  off by default — every CLI/test invocation also calls `create_app()`).
+  Admin observability + manual re-queue at `/admin/analytics/outbox`.
+  **Known limitation**: `enqueue()` commits its own short transaction, not
+  atomically with the business operation that triggered it — a crash in
+  that narrow window could still lose an event. A fully atomic
+  transactional outbox is the natural next step if that risk matters more
+  than the complexity of threading a shared session through every call
+  site.
+- Bot: every proactive notification now carries contextual buttons (open
+  the game/tournament/Fantasy screen, profile, notification settings),
+  respects per-category preferences (`👤 Мой кабинет` → `🔔 Уведомления`),
+  and deduplicates by `event_id` (`X-Event-Id` header) so an outbox retry
+  can never send a message twice.
+
+**Deep links (increment 8)**
+- `bot/deeplink.py` — `/start <payload>` opens a specific screen (game,
+  tournament, series evening, Fantasy hub, season table, gifts inbox)
+  instead of always the main menu. MS templates (`games/detail.html`,
+  `tournaments/detail.html`) now show a "В боте" link generating these
+  payloads via a new `telegram_deep_link()` Jinja helper.
+- **Not built**: a Telegram Web App. Nothing implemented so far needs one
+  — catalogs, tables and Fantasy picks all paginate fine with inline
+  buttons — so it's deliberately deferred rather than added speculatively,
+  per the spec's own "only where buttons genuinely can't do it" guidance.
+
+**Tests**: every existing test file touched by a signature/behavior change
+was updated in place (menu, tournaments, fantasy, ratings/history/economy,
+vs, account, notifications) rather than left broken; large batches of new
+tests added for the new modules (`storage`, `keyboards/nav`, `dispatch`,
+`deeplink`, `ui`, shop/inventory/gifts presenters/handlers). Could not be
+executed in the authoring environment (no Python interpreter available) —
+see the final session report for exact commands to run and what remains
+unverified.
+
 ### Added — Полировка: постоянное Reply-меню (последний пункт полировки)
 
 - `bot/presenters/menu.py` (`build_main_menu_markup`) — постоянная

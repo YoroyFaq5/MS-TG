@@ -36,9 +36,17 @@ bot/
   services/            # бизнес-правила бота (склейка handlers ↔ api_client)
   api_client/          # единственное место HTTP-вызовов к основному сайту
   webhooks/            # обработка входящих событий ОТ основного сайта
+  keyboards/nav.py      # версионированный callback_data, Назад/Домой, пагинация
+  dispatch.py           # guarded_callback — общий wrapper колбэков (double-tap, гарантированный answer)
+  storage.py            # локальный SQLite: FSM, дедуп событий, настройки уведомлений
+  deeplink.py            # /start <payload> → конкретный экран
+  ui.py                  # esc()/форматирование — общая "дизайн-система" пресентеров
   security.py          # проверка подписи вебхука Telegram и HMAC входящих событий
 tests/                  # юнит-тесты (пресентеры/security — без сети и без реального токена)
 ```
+
+Подробности новой архитектуры (навигация, `storage.py`, outbox, deep
+links) — см. [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Переменные окружения
 

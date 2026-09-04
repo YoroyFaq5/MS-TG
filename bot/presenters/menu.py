@@ -1,17 +1,42 @@
+"""
+Main menu — inline hierarchical navigation (see PROMPT_FOR_CLAUDE_BOT.md
+section 2). A single compact Reply Keyboard button ("🏠 Меню") is the only
+non-inline UI element left in the whole bot; every actual screen after that
+is an inline keyboard editing the same message in place.
+"""
+from typing import Tuple
+
 from telebot import types
 
-MENU_ROWS = [
-    ["👤 Профиль", "📊 Статистика"],
-    ["🏆 Рейтинг", "📜 История"],
-    ["💰 Баланс", "🏅 Достижения"],
-    ["🎮 Турниры", "🎯 Fantasy"],
-    ["🆚 Кто круче"],
-    ["⚙️ Аккаунт"],
+from bot.keyboards.nav import cb
+
+# (section key, button label, short hub subtitle)
+MAIN_SECTIONS = [
+    ("profile", "👤 Мой кабинет"),
+    ("rating", "🏆 Рейтинги"),
+    ("tourn", "🎮 Турниры"),
+    ("fantasy", "🎯 Fantasy"),
+    ("shop", "🛍 Магазин"),
+    ("inv", "🎒 Инвентарь"),
+    ("gift", "🎁 Подарки"),
+    ("vs", "🆚 Сравнить игроков"),
+    ("notif", "🔔 Уведомления"),
 ]
 
 
-def build_main_menu_markup() -> types.ReplyKeyboardMarkup:
+def build_reply_keyboard() -> types.ReplyKeyboardMarkup:
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    for row in MENU_ROWS:
-        markup.row(*row)
+    markup.row("🏠 Меню")
     return markup
+
+
+def build_main_menu_message() -> Tuple[str, types.InlineKeyboardMarkup]:
+    text = "🏠 <b>Главное меню MafiaStyle</b>\n\nВыбери раздел:"
+    markup = types.InlineKeyboardMarkup()
+    for i in range(0, len(MAIN_SECTIONS), 2):
+        chunk = MAIN_SECTIONS[i:i + 2]
+        markup.row(*[
+            types.InlineKeyboardButton(label, callback_data=cb("nav", "open", key))
+            for key, label in chunk
+        ])
+    return text, markup

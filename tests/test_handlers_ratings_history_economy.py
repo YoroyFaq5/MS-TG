@@ -59,14 +59,16 @@ def test_handle_history_with_page_arg():
 
 def test_handle_history_page_callback():
     from bot.handlers.history import handle_history_page_callback
+    from bot.keyboards.nav import cb
 
     history_data = {"items": [{
         "slot": {"role": "civilian", "total_score": 1.0, "is_pu": False},
-        "game": {"played_at": "2026-06-21T12:00:00+00:00"},
+        "game": {"id": 1, "played_at": "2026-06-21T12:00:00+00:00"},
         "won": True,
     }], "page": 2, "per_page": 10}
-    call = _fake_callback("history:2")
-    with patch("bot.handlers.history.get_history", return_value=history_data) as mock_get, \
+    call = _fake_callback(cb("history", "list", 2))
+    with patch("bot.handlers.history.resolve_player_id", return_value=7), \
+         patch("bot.handlers.history.get_history", return_value=history_data) as mock_get, \
          patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
          patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
         handle_history_page_callback(call)
@@ -78,10 +80,11 @@ def test_handle_history_page_callback():
 
 def test_handle_rating_page_callback():
     from bot.handlers.ratings import handle_rating_page_callback
+    from bot.keyboards.nav import cb
 
     ratings_data = {"items": [{"rank": 1, "display_name": "Alice", "win_rate": 60.0, "games_played": 5}],
                      "page": 2, "total_pages": 2}
-    call = _fake_callback("rating:2")
+    call = _fake_callback(cb("rating", "global", 2))
     with patch("bot.handlers.ratings.get_ratings", return_value=ratings_data) as mock_get, \
          patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
          patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
@@ -151,7 +154,7 @@ def test_handle_achievement_toggle_callback_api_error():
 def test_handle_titles_success():
     from bot.handlers.achievements import handle_titles
 
-    items = [{"title": {"name": "Champion"}, "equipped": False, "revoked": False}]
+    items = [{"id": 1, "title": {"name": "Champion"}, "equipped": False, "revoked": False}]
     message = _fake_message()
     with patch("bot.services.linking_service.resolve", return_value={"linked": True, "player_id": 7}), \
          patch("bot.handlers.achievements.get_titles", return_value=items), \

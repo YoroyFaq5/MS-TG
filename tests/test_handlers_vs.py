@@ -44,8 +44,8 @@ def test_handle_vs_menu_shows_candidates_excluding_self():
 
     markup = mock_send.call_args.kwargs["reply_markup"]
     buttons = [b for row in markup.keyboard for b in row]
-    assert len(buttons) == 1
-    assert buttons[0].callback_data == "vs:9"
+    assert any(b.callback_data == "vs:9" for b in buttons)
+    assert not any(b.callback_data == "vs:7" for b in buttons)
 
 
 def test_handle_vs_callback_success():

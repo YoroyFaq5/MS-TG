@@ -2,6 +2,8 @@ from typing import List
 
 from telebot import types
 
+from bot.ui import esc
+
 
 def build_inline_results(players: list) -> List[types.InlineQueryResultArticle]:
     """
@@ -14,7 +16,7 @@ def build_inline_results(players: list) -> List[types.InlineQueryResultArticle]:
     results = []
     for p in players:
         elo = round(p["elo"])
-        text = f"👤 <b>{p['display_name']}</b> — ELO {elo}"
+        text = f"👤 <b>{esc(p['display_name'])}</b> — ELO {elo}"
         results.append(types.InlineQueryResultArticle(
             id=str(p["id"]),
             title=p["display_name"],

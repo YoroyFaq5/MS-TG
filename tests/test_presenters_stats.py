@@ -30,7 +30,7 @@ def test_build_stats_message_includes_core_fields():
     assert "60.0%" in text
     assert "Точность ЛХ: 66.7%" in text
     assert "2026-06-21" in text
-    assert markup is None
+    assert markup is not None  # nav footer (Home) is always present
 
 
 def test_build_stats_message_without_pu_accuracy():

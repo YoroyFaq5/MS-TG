@@ -1,12 +1,20 @@
 """
 Обработка входящих fire-and-forget событий ОТ основного сайта (MS) —
-подпись уже проверена в bot/__init__.py::incoming_event ДО того, как
-payload попадает сюда. Каждый тип события — своя функция, реестр
+подпись уже проверена в bot/__init__.py::incoming_event, а дедупликация по
+event_id (если сайт его передал) — тоже там, один раз для всего события
+(next-slot фанится на нескольких получателей, но это по-прежнему ОДНО
+событие с одним X-Event-Id). Каждый тип события — своя функция, реестр
 EVENT_HANDLERS ниже; dispatch() возвращает False для неизвестных типов
 (роут отвечает 501, а не падает).
+
+Presenters теперь возвращают (text, markup, category) — category — один из
+bot.storage.NOTIFICATION_CATEGORIES, проверяется здесь ПЕРЕД отправкой,
+чтобы уважать пользовательские настройки уведомлений (/ 🔔 Уведомления
+в главном меню).
 """
 import logging
 
+from bot import storage
 from bot.presenters.notifications import (
     build_next_slot_message,
     build_achievement_granted_message,
@@ -22,46 +30,50 @@ from bot.presenters.notifications import (
 logger = logging.getLogger(__name__)
 
 
-def handle_next_slot(payload: dict) -> None:
+def _send(telegram_id, text: str, markup, category: str) -> None:
     from bot.telegram_bot import bot
 
+    if not telegram_id:
+        return
+    try:
+        telegram_id = int(telegram_id)
+    except (TypeError, ValueError):
+        return
+    if not storage.is_notification_enabled(telegram_id, category):
+        return
+    try:
+        bot.send_message(telegram_id, text, reply_markup=markup)
+    except Exception:
+        # Сбой отправки одному игроку (например, он ни разу не нажал
+        # /start в диалоге с ботом — Telegram не даст написать первым)
+        # не должен прерывать рассылку остальным.
+        logger.exception("Не удалось отправить уведомление (категория %s) telegram_id=%s", category, telegram_id)
+
+
+def handle_next_slot(payload: dict) -> None:
     for player in payload.get("players", []):
         telegram_id = player.get("telegram_id")
         if not telegram_id:
             continue
-        text = build_next_slot_message(player)
-        try:
-            bot.send_message(int(telegram_id), text)
-        except Exception:
-            # Сбой отправки одному игроку (например, он ни разу не нажал
-            # /start в диалоге с ботом — Telegram не даст написать первым)
-            # не должен прерывать рассылку остальным.
-            logger.exception(
-                "Не удалось отправить next-slot уведомление telegram_id=%s", telegram_id
-            )
+        text, markup, category = build_next_slot_message(player)
+        _send(telegram_id, text, markup, category)
 
 
 def _make_simple_handler(builder):
     """
     Большинство событий (в отличие от next-slot) — один получатель,
     telegram_id прямо в payload. Общий шаблон вместо восьми одинаковых
-    функций: собрать текст пресентером, отправить, залогировать и
-    проглотить сбой отправки (тот же принцип, что и next-slot).
+    функций: собрать (текст, клавиатуру, категорию) пресентером, проверить
+    настройки получателя, отправить, залогировать и проглотить сбой
+    отправки (тот же принцип, что и next-slot).
     """
     def handler(payload: dict) -> None:
-        from bot.telegram_bot import bot
-
         telegram_id = payload.get("telegram_id")
         if not telegram_id:
             return
-        text = builder(payload)
-        try:
-            bot.send_message(int(telegram_id), text)
-        except Exception:
-            logger.exception(
-                "Не удалось отправить уведомление (%s) telegram_id=%s",
-                builder.__name__, telegram_id,
-            )
+        text, markup, category = builder(payload)
+        _send(telegram_id, text, markup, category)
+    handler.__name__ = f"handle_{builder.__name__}"
     return handler
 
 

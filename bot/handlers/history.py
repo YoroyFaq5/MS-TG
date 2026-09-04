@@ -6,6 +6,9 @@ from bot.api_client.endpoints.history import get_history
 from bot.presenters.profile import build_not_linked_message
 from bot.presenters.history import build_history_message
 from bot.services.linking_service import resolve_player_id
+from bot.dispatch import guarded_callback
+from bot.keyboards.nav import is_cb, parse_cb
+from bot.ui import error_state
 
 logger = logging.getLogger(__name__)
 
@@ -26,25 +29,22 @@ def handle_history(message) -> None:
         data = get_history(api_client, telegram_id, page=page, per_page=10)
     except ApiError:
         logger.exception("/history failed")
-        bot.send_message(message.chat.id, "⚠️ Не удалось получить историю, попробуйте позже.")
+        bot.send_message(message.chat.id, error_state("Не удалось получить историю."))
         return
 
     text, markup = build_history_message(data)
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("history:"))
+@bot.callback_query_handler(func=lambda call: is_cb(call.data, "history", "list"))
+@guarded_callback(bot)
 def handle_history_page_callback(call) -> None:
-    page = int(call.data.split(":", 1)[1])
+    _, _, page = parse_cb(call.data)
     telegram_id = call.from_user.id
-
-    try:
-        data = get_history(api_client, telegram_id, page=page, per_page=10)
-    except ApiError:
-        logger.exception("history page callback failed")
-        bot.answer_callback_query(call.id, "⚠️ Не удалось получить историю, попробуйте позже.")
-        return
-
-    text, markup = build_history_message(data)
+    if resolve_player_id(api_client, telegram_id) is None:
+        text, markup = build_not_linked_message()
+    else:
+        data = get_history(api_client, telegram_id, page=int(page), per_page=10)
+        text, markup = build_history_message(data)
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
     bot.answer_callback_query(call.id)

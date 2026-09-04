@@ -21,3 +21,11 @@ def unpin(client: ApiClient, telegram_id: int, achievement_id: int) -> None:
 
 def get_titles(client: ApiClient, telegram_id: int) -> list:
     return client.get(f"{_PREFIX}/titles", params={"telegram_id": telegram_id})
+
+
+def equip_title(client: ApiClient, telegram_id: int, player_title_id: int) -> dict:
+    return client.post(f"{_PREFIX}/titles/{player_title_id}/equip", json={"telegram_id": telegram_id})
+
+
+def unequip_title(client: ApiClient, telegram_id: int) -> dict:
+    return client.post(f"{_PREFIX}/titles/unequip", json={"telegram_id": telegram_id})

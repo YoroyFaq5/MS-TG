@@ -12,71 +12,102 @@ from bot.presenters.notifications import (
 
 
 def test_build_next_slot_message_includes_all_fields():
-    text = build_next_slot_message({
+    text, markup, category = build_next_slot_message({
         "tournament_name": "Test Cup",
         "round_number": 2,
         "table_number": 1,
         "seat_number": 7,
+        "game_id": 42,
     })
     assert "Test Cup" in text
     assert "Раунд 2" in text
     assert "стол №1" in text
     assert "7" in text
+    assert category == "slot"
+    assert markup is not None
 
 
 def test_build_next_slot_message_handles_missing_tournament_name():
-    text = build_next_slot_message({"round_number": 1, "table_number": 1, "seat_number": 3})
+    text, _, _ = build_next_slot_message({"round_number": 1, "table_number": 1, "seat_number": 3})
     assert "турнире" in text
 
 
 def test_build_achievement_granted_message():
-    text = build_achievement_granted_message({"achievement_name": "First Win"})
+    text, _, category = build_achievement_granted_message({"achievement_name": "First Win"})
     assert "First Win" in text
+    assert category == "award"
 
 
 def test_build_title_granted_message():
-    text = build_title_granted_message({"title_name": "Champion"})
+    text, _, category = build_title_granted_message({"title_name": "Champion"})
     assert "Champion" in text
+    assert category == "award"
 
 
 def test_build_item_bought_out_message():
-    text = build_item_bought_out_message({
+    text, _, category = build_item_bought_out_message({
         "item_name": "Golden Frame", "buyer_name": "Bob", "offer_price": 1200.0, "payout": 960.0,
     })
-    assert "Golden Frame" in text and "Bob" in text and "1200" in text and "960" in text
+    assert "Golden Frame" in text and "Bob" in text and "1 200" in text and "960" in text
+    assert category == "shop"
 
 
 def test_build_fantasy_result_message():
-    text = build_fantasy_result_message({"tournament_name": "Cup", "points": 12.5})
+    text, _, category = build_fantasy_result_message({"tournament_name": "Cup", "points": 12.5})
     assert "Cup" in text and "12.5" in text
+    assert category == "fantasy"
 
 
 def test_build_fantasy_prize_message():
-    text = build_fantasy_prize_message({"tournament_name": "Cup", "place": 1, "amount": 70.0})
+    text, _, category = build_fantasy_prize_message({"tournament_name": "Cup", "place": 1, "amount": 70.0})
     assert "1 место" in text and "Cup" in text and "70" in text
+    assert category == "fantasy"
 
 
 def test_build_gift_received_message_with_note():
-    text = build_gift_received_message({"sender_name": "Bob", "item_name": "Frame", "message": "gg"})
+    text, _, category = build_gift_received_message({"sender_name": "Bob", "item_name": "Frame", "message": "gg"})
     assert "Bob" in text and "Frame" in text and "gg" in text
+    assert category == "gift"
 
 
 def test_build_gift_received_message_without_note():
-    text = build_gift_received_message({"sender_name": "Bob", "item_name": "Frame", "message": None})
+    text, _, _ = build_gift_received_message({"sender_name": "Bob", "item_name": "Frame", "message": None})
     assert "Bob" in text and "«»" not in text
 
 
+def test_build_gift_received_message_escapes_html():
+    text, _, _ = build_gift_received_message({
+        "sender_name": "<script>alert(1)</script>", "item_name": "Frame", "message": "<b>hi</b>",
+    })
+    assert "<script>" not in text
+    assert "&lt;script&gt;" in text
+    assert "<b>hi</b>" not in text
+
+
 def test_build_season_award_message():
-    text = build_season_award_message({"season_name": "Сезон 1", "rank": 1, "amount": 500.0})
+    text, _, category = build_season_award_message({"season_name": "Сезон 1", "rank": 1, "amount": 500.0, "season_id": 3})
     assert "Сезон 1" in text and "#1" in text and "500" in text
+    assert category == "season"
 
 
 def test_build_game_finished_message_won():
-    text = build_game_finished_message({"won": True, "total_score": 1.5, "bonus_score": 0.5})
+    text, _, category = build_game_finished_message({"won": True, "total_score": 1.5, "bonus_score": 0.5, "game_id": 1})
     assert "✅" in text and "1.5" in text and "+0.5" in text
+    assert category == "game"
 
 
 def test_build_game_finished_message_lost_no_bonus():
-    text = build_game_finished_message({"won": False, "total_score": 0.0, "bonus_score": 0.0})
+    text, _, _ = build_game_finished_message({"won": False, "total_score": 0.0, "bonus_score": 0.0})
     assert "❌" in text
     assert "бонус" not in text
+
+
+def test_every_notification_has_settings_and_home_buttons():
+    """Every proactive notification must offer a way to configure
+    notifications and a way back to the main menu (spec section 4)."""
+    from bot.keyboards.nav import cb
+
+    _, markup, _ = build_achievement_granted_message({"achievement_name": "X"})
+    all_callback_data = [btn.callback_data for row in markup.keyboard for btn in row]
+    assert cb("notif", "settings") in all_callback_data
+    assert cb("nav", "home") in all_callback_data

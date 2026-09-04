@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock, patch
 
+from bot.keyboards.nav import cb
+
 
 def _fake_message(chat_id=555, text=""):
     m = MagicMock()
@@ -7,31 +9,6 @@ def _fake_message(chat_id=555, text=""):
     m.chat.id = chat_id
     m.text = text
     return m
-
-
-def test_handle_tournaments_default():
-    from bot.handlers.tournaments import handle_tournaments
-
-    data = {"items": [{"id": 1, "name": "Test Cup", "status": "active"}]}
-    message = _fake_message(text="/tournaments")
-    with patch("bot.handlers.tournaments.get_tournaments", return_value=data) as mock_get, \
-         patch("bot.telegram_bot.bot.send_message") as mock_send:
-        handle_tournaments(message)
-
-    assert mock_get.call_args.kwargs["status"] is None
-    assert "Test Cup" in mock_send.call_args[0][1]
-
-
-def test_handle_tournaments_with_status_filter():
-    from bot.handlers.tournaments import handle_tournaments
-
-    data = {"items": []}
-    message = _fake_message(text="/tournaments finished")
-    with patch("bot.handlers.tournaments.get_tournaments", return_value=data) as mock_get, \
-         patch("bot.telegram_bot.bot.send_message"):
-        handle_tournaments(message)
-
-    assert mock_get.call_args.kwargs["status"] == "finished"
 
 
 def _fake_callback(data, telegram_id=111, chat_id=555, message_id=999, call_id=42):
@@ -44,33 +21,106 @@ def _fake_callback(data, telegram_id=111, chat_id=555, message_id=999, call_id=4
     return c
 
 
-def test_handle_tournament_detail_callback_not_found():
-    from bot.api_client.exceptions import ApiNotFound
-    from bot.handlers.tournaments import handle_tournament_detail_callback
+def _paged(items, page=1, total_pages=1):
+    return {"items": items, "page": page, "per_page": 8, "total": len(items), "total_pages": total_pages}
 
-    call = _fake_callback("tourn:999")
+
+def test_handle_tournaments_default():
+    from bot.handlers.tournaments import handle_tournaments
+
+    data = _paged([{"id": 1, "name": "Test Cup", "status": "active", "series_tournament_id": None}])
+    message = _fake_message(text="/tournaments")
+    with patch("bot.handlers.tournaments.get_tournaments", return_value=data) as mock_get, \
+         patch("bot.telegram_bot.bot.send_message") as mock_send:
+        handle_tournaments(message)
+
+    assert mock_get.call_args.kwargs["status"] is None
+    assert "Test Cup" in mock_send.call_args[0][1]
+
+
+def test_handle_tournaments_with_status_filter():
+    from bot.handlers.tournaments import handle_tournaments
+
+    data = _paged([])
+    message = _fake_message(text="/tournaments finished")
+    with patch("bot.handlers.tournaments.get_tournaments", return_value=data) as mock_get, \
+         patch("bot.telegram_bot.bot.send_message"):
+        handle_tournaments(message)
+
+    assert mock_get.call_args.kwargs["status"] == "finished"
+
+
+def test_handle_tournament_list_callback_parses_status_and_page():
+    from bot.handlers.tournaments import handle_tournament_list_callback
+
+    data = _paged([])
+    call = _fake_callback(cb("tourn", "list", "active", 2))
+    with patch("bot.handlers.tournaments.get_tournaments", return_value=data) as mock_get, \
+         patch("bot.telegram_bot.bot.edit_message_text"), \
+         patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
+        handle_tournament_list_callback(call)
+
+    assert mock_get.call_args.kwargs["status"] == "active"
+    assert mock_get.call_args.kwargs["page"] == 2
+    mock_answer.assert_called_once_with(42)
+
+
+def test_handle_tournament_list_callback_dash_means_no_filter():
+    from bot.handlers.tournaments import handle_tournament_list_callback
+
+    call = _fake_callback(cb("tourn", "list", "-", 1))
+    with patch("bot.handlers.tournaments.get_tournaments", return_value=_paged([])) as mock_get, \
+         patch("bot.telegram_bot.bot.edit_message_text"), \
+         patch("bot.telegram_bot.bot.answer_callback_query"):
+        handle_tournament_list_callback(call)
+    assert mock_get.call_args.kwargs["status"] is None
+
+
+def test_handle_tournament_open_callback_not_found():
+    from bot.api_client.exceptions import ApiNotFound
+    from bot.handlers.tournaments import handle_tournament_open_callback
+
+    call = _fake_callback(cb("tourn", "open", 999, 0))
     with patch("bot.handlers.tournaments.get_tournament_detail", side_effect=ApiNotFound("nf")), \
          patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
          patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
-        handle_tournament_detail_callback(call)
+        handle_tournament_open_callback(call)
 
-    mock_edit.assert_not_called()
-    assert "не найден" in mock_answer.call_args[0][1]
+    assert "существует" in mock_edit.call_args[0][0]
+    mock_answer.assert_called_once()
 
 
-def test_handle_tournament_detail_callback_success():
-    from bot.handlers.tournaments import handle_tournament_detail_callback
+def test_handle_tournament_open_callback_plain_tournament():
+    from bot.handlers.tournaments import handle_tournament_open_callback
 
     data = {
         "tournament": {"id": 1, "name": "Test Cup", "status": "active", "type": "individual"},
         "participant_count": 10, "games_finished": 1, "games_total": 3,
-        "active_stage": None, "player_ratings": [],
+        "active_stage": None, "can_view_standings": True, "player_ratings": [], "team_ratings": [],
     }
-    call = _fake_callback("tourn:1")
-    with patch("bot.handlers.tournaments.get_tournament_detail", return_value=data), \
+    call = _fake_callback(cb("tourn", "open", 1, 0))
+    with patch("bot.handlers.tournaments.get_tournament_detail", return_value=data) as mock_get, \
          patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
          patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
-        handle_tournament_detail_callback(call)
+        handle_tournament_open_callback(call)
 
     assert "Test Cup" in mock_edit.call_args[0][0]
+    assert mock_get.call_args.kwargs["telegram_id"] == 111
     mock_answer.assert_called_once()
+
+
+def test_handle_tournament_open_callback_series_tournament():
+    from bot.handlers.tournaments import handle_tournament_open_callback
+
+    data = {
+        "series_tournament": {"id": 5, "tournament_id": 1, "tournament": {"id": 1, "name": "Series Cup"}},
+        "series": [], "overall_leaderboard": [],
+    }
+    call = _fake_callback(cb("tourn", "open", 1, 5))
+    with patch("bot.handlers.tournaments.get_series_tournament_detail", return_value=data) as mock_get, \
+         patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
+         patch("bot.telegram_bot.bot.answer_callback_query"):
+        handle_tournament_open_callback(call)
+
+    assert mock_get.call_args.args[-1] == 5
+    assert "Series Cup" in mock_edit.call_args[0][0]

@@ -22,13 +22,20 @@ def create_app(config_name: str = "default"):
     from bot.config import config_map
     from bot.logging_config import setup_logging
     from bot.security import verify_event_signature, verify_telegram_secret
+    from bot import storage
+    from bot.ratelimit import check_rate_limit
 
     logger = logging.getLogger(__name__)
     app = Flask(__name__)
     cfg = config_map[config_name]
     app.config.from_object(cfg)
+    # Both incoming directions send small JSON — reject anything absurd
+    # before Flask/telebot even try to parse it (see PROMPT_FOR_CLAUDE_BOT.md
+    # security section: "ограничь размер JSON body").
+    app.config.setdefault("MAX_CONTENT_LENGTH", 256 * 1024)
 
     setup_logging(debug=cfg.DEBUG)
+    storage.init_db()
 
     # bot.telegram_bot читает Config при импорте (создаёт TeleBot/
     # ApiClient); bot.handlers регистрирует все @bot.message_handler
@@ -45,6 +52,8 @@ def create_app(config_name: str = "default"):
         received_secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
         if not verify_telegram_secret(received_secret, cfg.TELEGRAM_WEBHOOK_SECRET):
             abort(403)
+        if not check_rate_limit(f"webhook:{request.remote_addr or 'unknown'}"):
+            abort(429)
         update = telebot.types.Update.de_json(request.get_json(force=True))
         try:
             telegram_bot.process_new_updates([update])
@@ -61,9 +70,18 @@ def create_app(config_name: str = "default"):
         signature = request.headers.get("X-Signature")
         if not verify_event_signature(request.get_data(), signature, cfg.INCOMING_EVENT_SECRET):
             abort(403)
+        if not check_rate_limit(f"events:{request.remote_addr or 'unknown'}", limit=300):
+            abort(429)
         from bot.webhooks.events import dispatch
 
         payload = request.get_json(force=True, silent=True) or {}
+        event_id = request.headers.get("X-Event-Id") or payload.get("event_id")
+        if event_id and storage.is_event_processed(event_id):
+            # Outbox retry of something we already handled — MUST NOT
+            # re-send the Telegram message. See bot/webhooks/events.py for
+            # the same check applied per-recipient inside dispatch() too
+            # (an event can fan out to multiple players, e.g. next-slot).
+            return jsonify(ok=True, event_type=event_type, handled=True, duplicate=True), 200
         try:
             handled = dispatch(event_type, payload)
         except Exception:
@@ -72,6 +90,8 @@ def create_app(config_name: str = "default"):
             # стороне из-за временной проблемы у бота.
             logger.exception("Ошибка обработки события %s", event_type)
             return jsonify(ok=False, event_type=event_type), 200
+        if event_id:
+            storage.mark_event_processed(event_id)
         return jsonify(ok=True, event_type=event_type, handled=handled), (200 if handled else 501)
 
     return app

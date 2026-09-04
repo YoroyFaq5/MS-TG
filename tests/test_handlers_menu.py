@@ -1,125 +1,97 @@
 from unittest.mock import MagicMock, patch
 
+from bot.keyboards.nav import cb
 
-def _fake_message(telegram_id=111, chat_id=555, text=""):
+
+def _fake_message(chat_id=555, text=""):
     m = MagicMock()
-    m.from_user.id = telegram_id
     m.chat.id = chat_id
     m.text = text
     return m
 
 
-def test_menu_profile_delegates_to_handle_me():
-    from bot.handlers.menu import menu_profile
-
-    message = _fake_message(text="👤 Профиль")
-    with patch("bot.handlers.menu.handle_me") as mock_handle:
-        menu_profile(message)
-    mock_handle.assert_called_once_with(message)
-
-
-def test_menu_stats_delegates_to_handle_stats():
-    from bot.handlers.menu import menu_stats
-
-    message = _fake_message(text="📊 Статистика")
-    with patch("bot.handlers.menu.handle_stats") as mock_handle:
-        menu_stats(message)
-    mock_handle.assert_called_once_with(message)
+def _fake_call(data, chat_id=555, message_id=999, from_id=111, call_id="cbid1"):
+    call = MagicMock()
+    call.data = data
+    call.id = call_id
+    call.from_user.id = from_id
+    call.message.chat.id = chat_id
+    call.message.message_id = message_id
+    return call
 
 
-def test_menu_rating_delegates_to_handle_rating():
-    from bot.handlers.menu import menu_rating
+def test_noop_callback_is_always_answered():
+    """The decorative pagination page-indicator button must never leave a
+    stuck Telegram loading spinner."""
+    from bot.handlers.menu import handle_noop_callback
+    from bot.keyboards.nav import NOOP
 
-    message = _fake_message(text="🏆 Рейтинг")
-    with patch("bot.handlers.menu.handle_rating") as mock_handle:
-        menu_rating(message)
-    mock_handle.assert_called_once_with(message)
-
-
-def test_menu_history_delegates_to_handle_history():
-    from bot.handlers.menu import menu_history
-
-    message = _fake_message(text="📜 История")
-    with patch("bot.handlers.menu.handle_history") as mock_handle:
-        menu_history(message)
-    mock_handle.assert_called_once_with(message)
+    call = _fake_call(NOOP)
+    with patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
+        handle_noop_callback(call)
+    mock_answer.assert_called_once_with("cbid1")
 
 
-def test_menu_balance_delegates_to_handle_balance():
-    from bot.handlers.menu import menu_balance
+def test_menu_reply_button_sends_inline_main_menu():
+    from bot.handlers.menu import menu_reply_button
 
-    message = _fake_message(text="💰 Баланс")
-    with patch("bot.handlers.menu.handle_balance") as mock_handle:
-        menu_balance(message)
-    mock_handle.assert_called_once_with(message)
-
-
-def test_menu_achievements_delegates_to_handle_achievements():
-    from bot.handlers.menu import menu_achievements
-
-    message = _fake_message(text="🏅 Достижения")
-    with patch("bot.handlers.menu.handle_achievements") as mock_handle:
-        menu_achievements(message)
-    mock_handle.assert_called_once_with(message)
+    message = _fake_message(text="🏠 Меню")
+    with patch("bot.telegram_bot.bot.send_message") as mock_send, \
+         patch("bot.storage.clear_fsm_state") as mock_clear:
+        menu_reply_button(message)
+    mock_clear.assert_called_once_with(555)
+    assert "Главное меню" in mock_send.call_args[0][1]
 
 
-def test_menu_tournaments_delegates_to_handle_tournaments():
-    from bot.handlers.menu import menu_tournaments
+def test_handle_nav_home_edits_message_and_answers():
+    from bot.handlers.menu import handle_nav_home
 
-    message = _fake_message(text="🎮 Турниры")
-    with patch("bot.handlers.menu.handle_tournaments") as mock_handle:
-        menu_tournaments(message)
-    mock_handle.assert_called_once_with(message)
-
-
-def test_menu_fantasy_sends_help_text():
-    from bot.handlers.menu import menu_fantasy
-
-    message = _fake_message(text="🎯 Fantasy")
-    with patch("bot.telegram_bot.bot.send_message") as mock_send:
-        menu_fantasy(message)
-    text = mock_send.call_args[0][1]
-    assert "Fantasy" in text
-    assert "Турниры" in text
+    call = _fake_call(cb("nav", "home"))
+    with patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
+         patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer, \
+         patch("bot.storage.clear_fsm_state"):
+        handle_nav_home(call)
+    assert "Главное меню" in mock_edit.call_args[0][0]
+    mock_answer.assert_called_once_with("cbid1")
 
 
-def test_menu_vs_delegates_to_handle_vs_menu():
-    from bot.handlers.menu import menu_vs
+def test_handle_nav_open_dispatches_to_each_section():
+    from bot.handlers.menu import handle_nav_open
 
-    message = _fake_message(text="🆚 Кто круче")
-    with patch("bot.handlers.menu.handle_vs_menu") as mock_handle:
-        menu_vs(message)
-    mock_handle.assert_called_once_with(message)
-
-
-def test_menu_account_not_linked():
-    from bot.handlers.menu import menu_account
-
-    message = _fake_message(text="⚙️ Аккаунт")
-    with patch("bot.handlers.menu.resolve", return_value={"linked": False}), \
-         patch("bot.telegram_bot.bot.send_message") as mock_send:
-        menu_account(message)
-    assert "не привязан" in mock_send.call_args[0][1]
-
-
-def test_menu_account_linked():
-    from bot.handlers.menu import menu_account
-
-    message = _fake_message(text="⚙️ Аккаунт")
-    with patch("bot.handlers.menu.resolve", return_value={"linked": True, "display_name": "Alice"}), \
-         patch("bot.telegram_bot.bot.send_message") as mock_send:
-        menu_account(message)
-    text = mock_send.call_args[0][1]
-    assert "Alice" in text
-    assert "/unlink" in text
+    dispatch_targets = {
+        "profile": "bot.handlers.profile.handle_profile_open",
+        "rating": "bot.handlers.ratings.handle_rating_hub_callback",
+        "fantasy": "bot.handlers.fantasy.handle_fantasy_events",
+        "shop": "bot.handlers.shop.handle_shop_hub",
+        "inv": "bot.handlers.inventory.handle_inventory_hub",
+        "gift": "bot.handlers.gifts.handle_gift_hub",
+        "vs": "bot.handlers.vs.handle_vs_hub_callback",
+        "notif": "bot.handlers.notif_settings.handle_notif_settings",
+    }
+    for section, target in dispatch_targets.items():
+        call = _fake_call(cb("nav", "open", section))
+        with patch(target) as mock_handler, patch("bot.storage.clear_fsm_state"):
+            handle_nav_open(call)
+        mock_handler.assert_called_once_with(call)
 
 
-def test_menu_account_api_error():
-    from bot.api_client.exceptions import ApiError
-    from bot.handlers.menu import menu_account
+def test_handle_nav_open_tourn_calls_shared_list_helper():
+    from bot.handlers.menu import handle_nav_open
 
-    message = _fake_message(text="⚙️ Аккаунт")
-    with patch("bot.handlers.menu.resolve", side_effect=ApiError("boom")), \
-         patch("bot.telegram_bot.bot.send_message") as mock_send:
-        menu_account(message)
-    assert "не удалось" in mock_send.call_args[0][1].lower()
+    call = _fake_call(cb("nav", "open", "tourn"))
+    with patch("bot.handlers.tournaments.open_tournaments_list") as mock_open, \
+         patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer, \
+         patch("bot.storage.clear_fsm_state"):
+        handle_nav_open(call)
+    mock_open.assert_called_once_with(555, 999)
+    mock_answer.assert_called_once_with("cbid1")
+
+
+def test_handle_nav_open_unknown_section_just_answers():
+    from bot.handlers.menu import handle_nav_open
+
+    call = _fake_call(cb("nav", "open", "nonexistent"))
+    with patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer, \
+         patch("bot.storage.clear_fsm_state"):
+        handle_nav_open(call)
+    mock_answer.assert_called_once_with("cbid1")

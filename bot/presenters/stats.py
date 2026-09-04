@@ -1,12 +1,15 @@
-from typing import Optional, Tuple
+from typing import Tuple
 
 from telebot import types
 
+from bot.keyboards.nav import add_nav_footer, cb
+from bot.ui import esc
 
-def build_stats_message(data: dict) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:
+
+def build_stats_message(data: dict) -> Tuple[str, types.InlineKeyboardMarkup]:
     s = data["stats"]
     lines = [
-        f"📊 <b>Статистика — {s['display_name']}</b>",
+        f"📊 <b>Статистика — {esc(s['display_name'])}</b>",
         "",
         f"Игр: {s['total_games']} · Побед: {s['total_wins']} ({s['win_rate']}%)",
         f"Ср. баллы: {s['avg_score']} · Лучший: {s['best_score']} · Худший: {s['worst_score']}",
@@ -32,4 +35,4 @@ def build_stats_message(data: dict) -> Tuple[str, Optional[types.InlineKeyboardM
             f"Винрейт {cmp['win_rate']}% (клуб {cmp['club_avg_win_rate']}%, "
             f"лучше {cmp['win_rate_percentile']}%)"
         )
-    return "\n".join(lines), None
+    return "\n".join(lines), add_nav_footer(types.InlineKeyboardMarkup(), back_target=cb("profile", "open"))

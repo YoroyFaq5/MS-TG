@@ -3,6 +3,8 @@ from typing import List, Optional, Tuple
 
 from telebot import types
 
+from bot.ui import esc
+
 _LANDSLIDE = [
     "{winner} раскатал(а) {loser} по асфальту клуба 🚂💥",
     "{winner} сегодня в форме бога — {loser} даже не понял(а), что произошло 🔥",
@@ -52,8 +54,11 @@ def _stat_line(label: str, val_a, val_b, fmt: str) -> Tuple[str, int, int]:
 
 
 def build_vs_picker_message(items: List[dict], self_player_id: int) -> Tuple[str, types.InlineKeyboardMarkup]:
+    from bot.keyboards.nav import add_nav_footer, cb
+
     candidates = [r for r in items if r["player_id"] != self_player_id]
     markup = types.InlineKeyboardMarkup()
+    markup.row(types.InlineKeyboardButton("🔍 Искать по нику", callback_data=cb("vs", "search")))
     for r in candidates[:8]:
         markup.add(types.InlineKeyboardButton(
             f"{r['display_name']} ({round(r['elo'])})", callback_data=f"vs:{r['player_id']}",
@@ -64,13 +69,38 @@ def build_vs_picker_message(items: List[dict], self_player_id: int) -> Tuple[str
         "Или в любом чате напиши <code>@имя_бота Игрок1 vs Игрок2</code>, "
         "чтобы сравнить любых двух игроков."
     )
+    return text, add_nav_footer(markup)
+
+
+def build_vs_search_prompt_message() -> Tuple[str, types.InlineKeyboardMarkup]:
+    from bot.keyboards.nav import cb
+
+    text = "🔍 Напиши ник соперника одним сообщением."
+    markup = types.InlineKeyboardMarkup()
+    markup.row(types.InlineKeyboardButton("✖️ Отмена", callback_data=cb("vs", "hub")))
+    return text, markup
+
+
+def build_vs_search_results_message(candidates: list, query: str) -> Tuple[str, types.InlineKeyboardMarkup]:
+    from bot.keyboards.nav import cb
+    from bot.ui import esc
+
+    markup = types.InlineKeyboardMarkup()
+    for p in candidates:
+        markup.add(types.InlineKeyboardButton(
+            f"{p['display_name']} ({round(p['elo'])})", callback_data=f"vs:{p['id']}",
+        ))
+    text = f"Похожие на «{esc(query)}»:" if candidates else f"Никого не нашлось по «{esc(query)}»."
+    markup.row(types.InlineKeyboardButton("✖️ Отмена", callback_data=cb("vs", "hub")))
     return text, markup
 
 
 def build_vs_message(data: dict) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:
     a, b = data["player_a"], data["player_b"]
     sa, sb = data["stats_a"], data["stats_b"]
-    name_a, name_b = a["display_name"], b["display_name"]
+    # Escaped once, up front — every line below (including the randomized
+    # verdict templates further down) interpolates these, not the raw names.
+    name_a, name_b = esc(a["display_name"]), esc(b["display_name"])
 
     lines: List[str] = [f"🆚 <b>{name_a}</b> vs <b>{name_b}</b>", ""]
     points_a = points_b = 0
@@ -101,4 +131,5 @@ def build_vs_message(data: dict) -> Tuple[str, Optional[types.InlineKeyboardMark
         verdict = random.choice(pool).format(winner=winner, loser=loser)
     lines.append(verdict)
 
-    return "\n".join(lines), None
+    from bot.keyboards.nav import add_nav_footer, cb
+    return "\n".join(lines), add_nav_footer(types.InlineKeyboardMarkup(), back_target=cb("vs", "hub"))

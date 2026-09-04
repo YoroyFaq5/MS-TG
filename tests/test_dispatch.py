@@ -1,0 +1,97 @@
+"""
+bot/dispatch.py::guarded_callback — the shared callback_query wrapper every
+new-domain handler uses: swallows the shared NOOP button, enforces the
+double-tap lock for sensitive actions, and guarantees exactly one
+answer_callback_query on any path the wrapped handler didn't reach itself.
+"""
+from unittest.mock import MagicMock, patch
+
+from bot.dispatch import guarded_callback
+from bot.keyboards.nav import NOOP
+from bot.api_client.exceptions import ApiError
+
+
+def _fake_call(data="v1:x:y", call_id="cbid", from_id=111):
+    call = MagicMock()
+    call.data = data
+    call.id = call_id
+    call.from_user.id = from_id
+    return call
+
+
+def test_noop_is_answered_and_never_reaches_handler():
+    bot = MagicMock()
+    handler = MagicMock()
+    wrapped = guarded_callback(bot)(handler)
+
+    call = _fake_call(data=NOOP)
+    wrapped(call)
+
+    handler.assert_not_called()
+    bot.answer_callback_query.assert_called_once_with("cbid")
+
+
+def test_successful_handler_is_not_double_answered():
+    bot = MagicMock()
+
+    def handler(call):
+        bot.answer_callback_query(call.id, "done")
+
+    wrapped = guarded_callback(bot)(handler)
+    wrapped(_fake_call())
+
+    bot.answer_callback_query.assert_called_once_with("cbid", "done")
+
+
+def test_unhandled_exception_gets_exactly_one_answer():
+    bot = MagicMock()
+
+    def handler(call):
+        raise RuntimeError("boom")
+
+    wrapped = guarded_callback(bot)(handler)
+    wrapped(_fake_call())  # must not raise
+
+    bot.answer_callback_query.assert_called_once()
+
+
+def test_api_error_gets_exactly_one_answer():
+    bot = MagicMock()
+
+    def handler(call):
+        raise ApiError("business failure")
+
+    wrapped = guarded_callback(bot)(handler)
+    wrapped(_fake_call())
+
+    bot.answer_callback_query.assert_called_once()
+
+
+def test_sensitive_double_tap_is_rejected_without_running_handler_twice():
+    bot = MagicMock()
+    handler = MagicMock()
+    wrapped = guarded_callback(bot, sensitive=True)(handler)
+
+    call_1 = _fake_call(data="v1:shop:buy:1", call_id="a")
+    call_2 = _fake_call(data="v1:shop:buy:1", call_id="b")  # same actor + same action
+
+    wrapped(call_1)
+    wrapped(call_2)
+
+    assert handler.call_count == 1
+    # The (mock) handler itself never self-answers on its own success path
+    # (real handlers do) — the one answer_callback_query call observed here
+    # is the rejection toast for the blocked second tap.
+    bot.answer_callback_query.assert_called_once_with("b", "⏳ Уже обрабатывается — подождите секунду.", show_alert=False)
+
+
+def test_sensitive_lock_is_per_actor_and_action():
+    bot = MagicMock()
+    handler = MagicMock()
+    wrapped = guarded_callback(bot, sensitive=True)(handler)
+
+    wrapped(_fake_call(data="v1:shop:buy:1", from_id=111))
+    wrapped(_fake_call(data="v1:shop:buy:2", from_id=111))  # different item
+    wrapped(_fake_call(data="v1:shop:buy:1", from_id=222))  # different user
+
+    assert handler.call_count == 3

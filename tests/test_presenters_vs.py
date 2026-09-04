@@ -17,7 +17,7 @@ def test_build_vs_message_landslide_winner_gets_trophies():
     text, markup = build_vs_message(_compare_data())
     assert "Alice" in text and "Bob" in text
     assert "Счёт: 5:0" in text
-    assert markup is None
+    assert markup is not None  # nav footer (Home) is always present
 
 
 def test_build_vs_message_close_fight():
@@ -56,6 +56,8 @@ def test_build_vs_picker_message_excludes_self_and_builds_buttons():
     ]
     text, markup = build_vs_picker_message(items, self_player_id=7)
     buttons = [b for row in markup.keyboard for b in row]
-    assert len(buttons) == 1
-    assert buttons[0].callback_data == "vs:9"
-    assert "Rival" in buttons[0].text
+    vs_buttons = [b for b in buttons if b.callback_data == "vs:9"]
+    assert len(vs_buttons) == 1
+    assert "Rival" in vs_buttons[0].text
+    # Self must never appear as a pickable opponent.
+    assert not any(b.callback_data == "vs:7" for b in buttons)
