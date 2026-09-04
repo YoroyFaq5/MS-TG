@@ -1,6 +1,8 @@
+import pytest
+
 from bot.keyboards.nav import (
     cb, parse_cb, is_cb, home_button, back_button, nav_row, add_nav_footer,
-    pagination_row, confirm_row, NOOP, CALLBACK_MAX_BYTES,
+    pagination_row, confirm_row, NOOP, CALLBACK_MAX_BYTES, CallbackDataTooLong,
 )
 
 
@@ -33,6 +35,14 @@ def test_cb_never_exceeds_telegram_limit_for_realistic_ids():
     # укладываться в лимит Telegram 64 байта."
     data = cb("fantasy", "pickf", 999999999, 999999999, 1, 999999999)
     assert len(data.encode("utf-8")) <= CALLBACK_MAX_BYTES
+
+
+def test_cb_raises_when_encoded_string_exceeds_limit():
+    """CLAUDE_TASK_BOT_RU_GROUPS.md п.5.4: a callback_data that would
+    overflow Telegram's 64-byte limit must fail loudly at the call site
+    instead of silently producing a dead button."""
+    with pytest.raises(CallbackDataTooLong):
+        cb("some_very_long_domain_name", "some_very_long_action_name", 999999999999, "extra_padding_argument")
 
 
 def test_cb_never_contains_business_data_only_ids_and_actions():

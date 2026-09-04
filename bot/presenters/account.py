@@ -9,8 +9,8 @@ from bot.ui import esc
 def build_unlink_confirm_message() -> Tuple[str, types.InlineKeyboardMarkup]:
     text = (
         "🔓 Отвязать Telegram-аккаунт от сайта?\n\n"
-        "Вы перестанете получать уведомления, и команды профиля не будут "
-        "работать, пока не привяжете аккаунт заново на сайте."
+        "Ты перестанешь получать уведомления, и команды профиля не будут "
+        "работать, пока не привяжешь аккаунт заново на сайте."
     )
     markup = types.InlineKeyboardMarkup()
     markup.add(

@@ -2,11 +2,14 @@ from typing import Optional, Tuple
 
 from telebot import types
 
+from bot import i18n
 from bot.keyboards.nav import add_nav_footer, cb, pagination_row
-from bot.ui import esc, fmt_money, truncate
+from bot.ui import esc, truncate
 
-STATUS_ICONS = {"pending": "⏳", "active": "▶️", "finished": "🏁"}
-STATUS_LABELS = {"pending": "Ожидают", "active": "Активные", "finished": "Завершённые"}
+STATUS_ICONS = {"pending": "⏳", "active": "▶️", "finished": "🏁", "cancelled": "✖️"}
+STATUS_LABELS = {
+    "pending": "Ожидают", "active": "Активные", "finished": "Завершённые",
+}
 STATUS_FILTERS = [None, "active", "pending", "finished"]
 
 
@@ -17,7 +20,7 @@ def build_tournaments_list_message(
     page = data["page"]
     total_pages = data["total_pages"] or 1
     label = STATUS_LABELS.get(status, "Все")
-    lines = [f"🏟 <b>Турниры</b> — {label}, стр. {page}/{total_pages}", ""]
+    lines = [f"🏟 <b>Турниры</b> — {label}, {i18n.page_indicator(page, total_pages)}", ""]
     for t in items:
         icon = STATUS_ICONS.get(t["status"], "")
         series_mark = " 🔗" if t.get("series_tournament_id") else ""
@@ -49,9 +52,11 @@ def build_tournaments_list_message(
 
 def build_tournament_detail_message(data: dict) -> Tuple[str, types.InlineKeyboardMarkup]:
     t = data["tournament"]
+    status = i18n.tr("tournament_status", t["status"])
+    ttype = i18n.tr("tournament_type", t["type"])
     lines = [
-        f"🏟 <b>{esc(t['name'])}</b> ({t['status']})",
-        f"Тип: {t['type']} · Участников: {data['participant_count']}",
+        f"🏟 <b>{esc(t['name'])}</b> ({status})",
+        f"Тип: {ttype} · Участников: {data['participant_count']}",
         f"Игр: {data['games_finished']}/{data['games_total']}",
     ]
     if data.get("active_stage"):
@@ -65,12 +70,15 @@ def build_tournament_detail_message(data: dict) -> Tuple[str, types.InlineKeyboa
             lines.append("")
             lines.append("Топ игроков:")
             for r in ratings[:10]:
-                lines.append(f"{r['rank']}. {esc(r['display_name'])} — {r['win_rate']}%")
+                lines.append(f"{r['rank']}. {esc(r['display_name'])} — {i18n.fmt_percent(r['win_rate'])}")
 
     tid = t["id"]
     markup = types.InlineKeyboardMarkup()
     markup.row(
-        types.InlineKeyboardButton("🎯 Fantasy", callback_data=cb("fantasy", "tourn", tid)),
+        types.InlineKeyboardButton("🎯 Фэнтези", callback_data=cb("fantasy", "tourn", tid)),
+        types.InlineKeyboardButton(
+            "🔄 Обновить", callback_data=cb("tourn", "open", tid, data.get("series_tournament_id") or 0),
+        ),
     )
     return "\n".join(lines), add_nav_footer(markup, back_target=cb("tourn", "list", "-", 1))
 
@@ -85,13 +93,14 @@ def build_series_tournament_message(data: dict) -> Tuple[str, types.InlineKeyboa
         "Общий рейтинг:",
     ]
     for e in data["overall_leaderboard"][:10]:
-        lines.append(f"{e['rank']}. {esc(e['display_name'])} — {e['total_score']} ({e['series_played']} вечеров)")
+        evenings = i18n.fmt_count(e["series_played"], lambda n: i18n.plural(n, "вечер", "вечера", "вечеров"))
+        lines.append(f"{e['rank']}. {esc(e['display_name'])} — {i18n.fmt_score(e['total_score'])} ({evenings})")
     if not data["overall_leaderboard"]:
         lines.append("Пока нет результатов.")
 
     markup = types.InlineKeyboardMarkup()
     for s in sorted(data["series"], key=lambda s: s["order"]):
-        status_icon = {"pending": "⏳", "active": "▶️", "finished": "🏁", "cancelled": "✖️"}.get(s["status"], "")
+        status_icon = STATUS_ICONS.get(s["status"], "")
         markup.add(types.InlineKeyboardButton(
             f"{status_icon} {truncate(s['name'], 40)}",
             callback_data=cb("tourn", "series-evening", st["id"], s["id"]),
@@ -102,21 +111,25 @@ def build_series_tournament_message(data: dict) -> Tuple[str, types.InlineKeyboa
 def build_series_evening_message(data: dict) -> Tuple[str, types.InlineKeyboardMarkup]:
     st = data["series_tournament"]
     series = data["series"]
+    status = i18n.tr("series_status", series["status"])
     lines = [
         f"🌆 <b>{esc(series['name'])}</b> — {esc(st['tournament']['name'])}",
-        f"Игр: {series['games_count']} · Статус: {series['status']}",
+        f"Игр: {series['games_count']} · Статус: {status}",
         "",
         "Рейтинг вечера:",
     ]
     for r in data["leaderboard"][:15]:
-        lines.append(f"{r['rank']}. {esc(r['display_name'])} — {r['total_score']} ({r['win_rate']}%)")
+        lines.append(f"{r['rank']}. {esc(r['display_name'])} — {i18n.fmt_score(r['total_score'])} ({i18n.fmt_percent(r['win_rate'])})")
     if not data["leaderboard"]:
         lines.append("Пока нет результатов.")
 
     markup = types.InlineKeyboardMarkup()
     markup.row(types.InlineKeyboardButton(
-        "🎯 Fantasy этого вечера",
+        "🎯 Фэнтези этого вечера",
         callback_data=cb("fantasy", "series", st["tournament_id"], series["id"]),
+    ))
+    markup.row(types.InlineKeyboardButton(
+        "🔄 Обновить", callback_data=cb("tourn", "series-evening", st["id"], series["id"]),
     ))
     return "\n".join(lines), add_nav_footer(
         markup, back_target=cb("tourn", "open", st["tournament_id"], st["id"]),

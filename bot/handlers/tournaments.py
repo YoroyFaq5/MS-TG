@@ -11,6 +11,9 @@ from bot.presenters.tournaments import (
 from bot.dispatch import guarded_callback
 from bot.keyboards.nav import is_cb, parse_cb
 from bot.ui import error_state, stale_state
+from bot.chat_policy import is_group
+from bot.ratelimit import check_group_command_rate_limit
+from bot.presenters.group import build_group_tournaments_message, build_rate_limited_message
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +29,33 @@ def open_tournaments_list(chat_id: int, message_id=None, status=None, page: int 
         bot.send_message(chat_id, text, reply_markup=markup)
 
 
+def _handle_group_tournaments(message) -> None:
+    """Compact, non-paginated public /tournaments for group chats
+    (CLAUDE_TASK_BOT_RU_GROUPS.md, раздел 3) — same command name as the
+    private rich list, different (safe, short) behaviour."""
+    allowed, should_warn = check_group_command_rate_limit(message.chat.id, message.from_user.id)
+    if not allowed:
+        if should_warn:
+            bot.send_message(message.chat.id, build_rate_limited_message())
+        return
+    try:
+        active = get_tournaments(api_client, status="active", per_page=5)["items"]
+        pending = get_tournaments(api_client, status="pending", per_page=5)["items"] if len(active) < 5 else []
+    except ApiError:
+        logger.exception("group /tournaments failed")
+        bot.send_message(message.chat.id, error_state("Не удалось получить список турниров."))
+        return
+    combined = (active + pending)[:5]
+    text, markup = build_group_tournaments_message(combined)
+    bot.send_message(message.chat.id, text, reply_markup=markup)
+
+
 @bot.message_handler(commands=["tournaments"])
 def handle_tournaments(message) -> None:
+    if is_group(message.chat.type):
+        _handle_group_tournaments(message)
+        return
+
     parts = (message.text or "").split(maxsplit=1)
     status = parts[1].strip() if len(parts) > 1 and parts[1].strip() in _VALID_STATUSES else None
     try:
@@ -38,7 +66,7 @@ def handle_tournaments(message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "tourn", "list"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_tournament_list_callback(call) -> None:
     _, _, status_raw, page = parse_cb(call.data)
     status = None if status_raw == "-" else status_raw
@@ -46,7 +74,7 @@ def handle_tournament_list_callback(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "tourn", "open"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_tournament_open_callback(call) -> None:
     _, _, tournament_id, series_tournament_id = parse_cb(call.data)
     tournament_id, series_tournament_id = int(tournament_id), int(series_tournament_id)
@@ -69,7 +97,7 @@ def handle_tournament_open_callback(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "tourn", "series-evening"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_series_evening_callback(call) -> None:
     _, _, series_tournament_id, series_id = parse_cb(call.data)
     try:

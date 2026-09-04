@@ -14,6 +14,7 @@ def _fake_callback(data, telegram_id=111, chat_id=555, message_id=999, call_id=4
     c.data = data
     c.from_user.id = telegram_id
     c.message.chat.id = chat_id
+    c.message.chat.type = "private"
     c.message.message_id = message_id
     c.id = call_id
     return c
@@ -65,7 +66,7 @@ def test_handle_history_page_callback():
         "slot": {"role": "civilian", "total_score": 1.0, "is_pu": False},
         "game": {"id": 1, "played_at": "2026-06-21T12:00:00+00:00"},
         "won": True,
-    }], "page": 2, "per_page": 10}
+    }], "page": 2, "per_page": 10, "total": 15, "total_pages": 2, "has_next": False}
     call = _fake_callback(cb("history", "list", 2))
     with patch("bot.handlers.history.resolve_player_id", return_value=7), \
          patch("bot.handlers.history.get_history", return_value=history_data) as mock_get, \
@@ -74,7 +75,7 @@ def test_handle_history_page_callback():
         handle_history_page_callback(call)
 
     assert mock_get.call_args.kwargs["page"] == 2
-    assert "стр. 2" in mock_edit.call_args[0][0]
+    assert "2/2" in mock_edit.call_args[0][0]
     mock_answer.assert_called_once()
 
 
@@ -105,7 +106,7 @@ def test_handle_balance_success():
          patch("bot.telegram_bot.bot.send_message") as mock_send:
         handle_balance(message)
 
-    assert "42.0" in mock_send.call_args[0][1]
+    assert "42 монеты" in mock_send.call_args[0][1]
 
 
 def test_handle_achievements_success():
@@ -121,7 +122,27 @@ def test_handle_achievements_success():
     assert "First Win" in mock_send.call_args[0][1]
 
 
-def test_handle_achievement_toggle_callback_pin():
+def test_handle_achievement_toggle_callback_pin_versioned():
+    from bot.handlers.achievements import handle_achievement_toggle_callback
+    from bot.keyboards.nav import cb
+
+    items = [{"id": 3, "name": "First Win", "description": "d", "unlocked": True, "pinned": True}]
+    call = _fake_callback(cb("ach", "pin", 3))
+    with patch("bot.handlers.achievements.pin") as mock_pin, \
+         patch("bot.handlers.achievements.get_achievements", return_value=items), \
+         patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
+         patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
+        handle_achievement_toggle_callback(call)
+
+    mock_pin.assert_called_once_with(mock_pin.call_args[0][0], 111, 3)
+    assert "First Win" in mock_edit.call_args[0][0]
+    mock_answer.assert_called_once()
+
+
+def test_handle_achievement_toggle_callback_pin_legacy_unversioned_still_works():
+    """Backward compat (CLAUDE_TASK_BOT_RU_GROUPS.md п.5.3): a button from
+    a message sent before the v1: migration still carries the old raw
+    'ach:pin:<id>' callback_data — it must keep working."""
     from bot.handlers.achievements import handle_achievement_toggle_callback
 
     items = [{"id": 3, "name": "First Win", "description": "d", "unlocked": True, "pinned": True}]
@@ -140,8 +161,9 @@ def test_handle_achievement_toggle_callback_pin():
 def test_handle_achievement_toggle_callback_api_error():
     from bot.api_client.exceptions import ApiError
     from bot.handlers.achievements import handle_achievement_toggle_callback
+    from bot.keyboards.nav import cb
 
-    call = _fake_callback("ach:unpin:3")
+    call = _fake_callback(cb("ach", "unpin", 3))
     with patch("bot.handlers.achievements.unpin", side_effect=ApiError("boom")), \
          patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
          patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:

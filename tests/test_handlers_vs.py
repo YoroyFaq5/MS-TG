@@ -13,6 +13,7 @@ def _fake_callback(data, telegram_id=111, chat_id=555, message_id=999, call_id=4
     c.data = data
     c.from_user.id = telegram_id
     c.message.chat.id = chat_id
+    c.message.chat.type = "private"
     c.message.message_id = message_id
     c.id = call_id
     return c

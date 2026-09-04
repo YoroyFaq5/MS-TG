@@ -37,7 +37,7 @@ def handle_vs_menu(message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "vs", "hub"))
-@guarded_callback(bot)
+@guarded_callback(bot, private_only=True)
 def handle_vs_hub_callback(call) -> None:
     # Answer FIRST, before any network calls: Telegram's callback_query
     # token has its own short validity window, separate from the overall
@@ -46,8 +46,8 @@ def handle_vs_hub_callback(call) -> None:
     # already being expired ("query is too old") by the time we get here,
     # which silently drops the spinner with no feedback to the user.
     bot.answer_callback_query(call.id)
-    storage.clear_fsm_state(call.message.chat.id)
     telegram_id = call.from_user.id
+    storage.clear_fsm_state(call.message.chat.id, telegram_id)
     player_id = resolve_player_id(api_client, telegram_id)
     if player_id is None:
         text, markup = build_not_linked_message()
@@ -58,21 +58,21 @@ def handle_vs_hub_callback(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "vs", "search"))
-@guarded_callback(bot)
+@guarded_callback(bot, private_only=True)
 def handle_vs_search_start(call) -> None:
     bot.answer_callback_query(call.id)
-    storage.set_fsm_state(call.message.chat.id, SCENARIO, "await_query")
+    storage.set_fsm_state(call.message.chat.id, call.from_user.id, SCENARIO, "await_query")
     text, markup = build_vs_search_prompt_message()
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
 
 
 @bot.message_handler(
-    func=lambda m: (storage.get_fsm_state(m.chat.id) or {}).get("scenario") == SCENARIO,
+    func=lambda m: (storage.get_fsm_state(m.chat.id, m.from_user.id) or {}).get("scenario") == SCENARIO,
     content_types=["text"],
 )
 def handle_vs_search_text(message) -> None:
     query = (message.text or "").strip()
-    storage.clear_fsm_state(message.chat.id)
+    storage.clear_fsm_state(message.chat.id, message.from_user.id)
     if not query:
         return
     try:
@@ -87,7 +87,7 @@ def handle_vs_search_text(message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("vs:"))
-@guarded_callback(bot)
+@guarded_callback(bot, private_only=True)
 def handle_vs_callback(call) -> None:
     # Answer FIRST — see handle_vs_hub_callback above for why: resolve_player_id()
     # + compare() are two outbound HTTPS calls, and Telegram's callback_query

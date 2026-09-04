@@ -16,6 +16,7 @@ def _fake_callback(data, telegram_id=111, chat_id=555, message_id=999, call_id=4
     c.data = data
     c.from_user.id = telegram_id
     c.message.chat.id = chat_id
+    c.message.chat.type = "private"
     c.message.message_id = message_id
     c.id = call_id
     return c
@@ -316,7 +317,7 @@ def test_handle_season_myplace_no_games_played_yet():
          patch("bot.telegram_bot.bot.answer_callback_query"):
         handle_season_myplace(call)
 
-    assert "не сыграли рейтинговых игр" in mock_edit.call_args[0][0]
+    assert "нет сыгранных рейтинговых игр" in mock_edit.call_args[0][0]
 
 
 # ── 8. API errors — friendly toast, not a crash ─────────────────────────────

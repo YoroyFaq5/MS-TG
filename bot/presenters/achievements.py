@@ -24,7 +24,7 @@ def build_achievements_message(items: list) -> Tuple[str, Optional[types.InlineK
                 label, action = f"📤 Открепить «{short_name}»", "unpin"
             else:
                 label, action = f"📌 Закрепить «{short_name}»", "pin"
-            markup.add(types.InlineKeyboardButton(label, callback_data=f"ach:{action}:{a['id']}"))
+            markup.add(types.InlineKeyboardButton(label, callback_data=cb("ach", action, a["id"])))
     return "\n".join(lines), add_nav_footer(markup, back_target=cb("profile", "open"))
 
 

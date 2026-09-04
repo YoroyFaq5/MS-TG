@@ -35,13 +35,24 @@ _DEFAULT_ERROR_TOAST = "⚠️ Не удалось выполнить дейст
 _LOCKED_TOAST = "⏳ Уже обрабатывается — подождите секунду."
 
 
-def guarded_callback(bot, *, sensitive: bool = False, lock_ttl: float = 8.0, answer_immediately: bool = False):
+def guarded_callback(
+    bot, *, sensitive: bool = False, lock_ttl: float = 8.0,
+    answer_immediately: bool = False, private_only: bool = False,
+):
     """Decorator factory for `@bot.callback_query_handler` targets.
 
     Usage:
         @bot.callback_query_handler(func=lambda c: is_cb(c.data, "shop", "buy"))
-        @guarded_callback(bot, sensitive=True)
+        @guarded_callback(bot, sensitive=True, private_only=True)
         def handle_shop_buy(call): ...
+
+    private_only: reject the callback with a friendly toast (never
+    invoking the handler, never touching the double-tap lock) unless
+    call.message.chat.type == "private" (CLAUDE_TASK_BOT_RU_GROUPS.md,
+    раздел 2). Personal/mutating callbacks must set this — inline buttons
+    from a private-chat message can still end up tapped from a group if
+    that message was forwarded there, so this is checked per-callback,
+    not just per-command.
 
     answer_immediately: answer the callback_query right away (clearing
     Telegram's loading spinner) BEFORE calling the handler, instead of
@@ -73,6 +84,11 @@ def guarded_callback(bot, *, sensitive: bool = False, lock_ttl: float = 8.0, ans
         def wrapped(call):
             if call.data == NOOP:
                 bot.answer_callback_query(call.id)
+                return
+
+            if private_only and call.message.chat.type != "private":
+                from bot.chat_policy import PRIVATE_ONLY_TOAST
+                bot.answer_callback_query(call.id, PRIVATE_ONLY_TOAST, show_alert=True)
                 return
 
             lock_key = None

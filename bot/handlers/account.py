@@ -33,21 +33,21 @@ def handle_unlink(message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "account", "unlink-confirm"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_unlink_confirm_screen(call) -> None:
     text, markup = build_unlink_confirm_message()
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "account", "unlink-no"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_unlink_no(call) -> None:
     text, markup = build_unlink_cancelled_message()
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "account", "unlink-yes"))
-@guarded_callback(bot, sensitive=True)
+@guarded_callback(bot, sensitive=True, private_only=True)
 def handle_unlink_yes(call) -> None:
     telegram_id = call.from_user.id
     try:

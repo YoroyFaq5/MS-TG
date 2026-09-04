@@ -30,3 +30,4 @@ from bot.handlers import notif_settings  # noqa: F401
 from bot.handlers import account  # noqa: F401
 from bot.handlers import inline  # noqa: F401
 from bot.handlers import menu  # noqa: F401
+from bot.handlers import group_commands  # noqa: F401

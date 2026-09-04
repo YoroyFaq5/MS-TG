@@ -40,6 +40,18 @@ class Config:
 
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-prod")
 
+    # Опционально — см. bot/bot_identity.py: без него бот один раз узнаёт
+    # своё имя через bot.get_me() и кеширует на время работы процесса;
+    # заданное явно — экономит этот один сетевой вызов при первом запросе.
+    TELEGRAM_BOT_USERNAME = os.environ.get("TELEGRAM_BOT_USERNAME")
+
+    # Антиспам для команд общего чата (CLAUDE_TASK_BOT_RU_GROUPS.md, п.7) —
+    # по паре (chat_id, user_id), отдельно от общего вебхук-лимитера.
+    GROUP_COMMAND_LIMIT_SHORT = int(os.environ.get("GROUP_COMMAND_LIMIT_SHORT", "5"))
+    GROUP_COMMAND_WINDOW_SHORT_SECONDS = int(os.environ.get("GROUP_COMMAND_WINDOW_SHORT_SECONDS", "20"))
+    GROUP_COMMAND_LIMIT_LONG = int(os.environ.get("GROUP_COMMAND_LIMIT_LONG", "20"))
+    GROUP_COMMAND_WINDOW_LONG_SECONDS = int(os.environ.get("GROUP_COMMAND_WINDOW_LONG_SECONDS", "300"))
+
     # Таймауты исходящих запросов к API основного сайта (секунды).
     API_CONNECT_TIMEOUT = float(os.environ.get("API_CONNECT_TIMEOUT", "5"))
     API_READ_TIMEOUT = float(os.environ.get("API_READ_TIMEOUT", "10"))

@@ -39,13 +39,13 @@ def handle_rating(message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "rating", "hub"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_rating_hub_callback(call) -> None:
     open_ratings_hub(call.message.chat.id, call.message.message_id)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "rating", "global"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_rating_page_callback(call) -> None:
     _, _, page = parse_cb(call.data)
     data = get_ratings(api_client, scope="global", page=int(page), per_page=10)

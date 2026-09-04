@@ -13,8 +13,9 @@ tournaments, fantasy, gifts, notifications).
 """
 from telebot import types
 
+from bot import i18n
 from bot.keyboards.nav import cb, home_button
-from bot.ui import esc, fmt_money
+from bot.ui import esc
 
 
 def _settings_button() -> types.InlineKeyboardButton:
@@ -52,7 +53,7 @@ def build_achievement_granted_message(payload: dict):
 
 
 def build_title_granted_message(payload: dict):
-    text = f"🏅 Вам выдан титул: <b>{esc(payload['title_name'])}</b>!"
+    text = f"🏅 Тебе выдан титул: <b>{esc(payload['title_name'])}</b>!"
     row = [
         types.InlineKeyboardButton("👤 Профиль", callback_data=cb("profile", "open")),
         types.InlineKeyboardButton("🏅 Мои титулы", callback_data=cb("ach", "titles")),
@@ -62,8 +63,8 @@ def build_title_granted_message(payload: dict):
 
 def build_item_bought_out_message(payload: dict):
     text = (
-        f"💰 Ваш предмет «{esc(payload['item_name'])}» перекупил {esc(payload['buyer_name'])} "
-        f"за {fmt_money(payload['offer_price'])} монет — вам зачислено {fmt_money(payload['payout'])}."
+        f"💰 Твой предмет «{esc(payload['item_name'])}» перекупил {esc(payload['buyer_name'])} "
+        f"за {i18n.fmt_coins(payload['offer_price'])} — тебе зачислено {i18n.fmt_coins(payload['payout'])}."
     )
     row = [types.InlineKeyboardButton("🎒 Инвентарь", callback_data=cb("inv", "list"))]
     return text, _markup(row), "shop"
@@ -74,28 +75,28 @@ def _fantasy_button(payload: dict) -> list:
     tournament_id = payload.get("tournament_id")
     if series_id and tournament_id:
         return [types.InlineKeyboardButton(
-            "🎯 Fantasy", callback_data=cb("fantasy", "series", tournament_id, series_id),
+            "🎯 Фэнтези", callback_data=cb("fantasy", "series", tournament_id, series_id),
         )]
     if tournament_id:
-        return [types.InlineKeyboardButton("🎯 Fantasy", callback_data=cb("fantasy", "tourn", tournament_id))]
+        return [types.InlineKeyboardButton("🎯 Фэнтези", callback_data=cb("fantasy", "tourn", tournament_id))]
     return []
 
 
 def build_fantasy_result_message(payload: dict):
-    text = f"🎯 Fantasy: турнир «{esc(payload['tournament_name'])}» — {payload['points']} очков."
+    text = f"🎯 Фэнтези: турнир «{esc(payload['tournament_name'])}» — {i18n.fmt_points(payload['points'])}."
     return text, _markup(_fantasy_button(payload)), "fantasy"
 
 
 def build_fantasy_prize_message(payload: dict):
     text = (
-        f"🎉 Fantasy: {payload['place']} место в «{esc(payload['tournament_name'])}» — "
-        f"+{fmt_money(payload['amount'])} монет!"
+        f"🎉 Фэнтези: {payload['place']} место в «{esc(payload['tournament_name'])}» — "
+        f"+{i18n.fmt_coins(payload['amount'])}!"
     )
     return text, _markup(_fantasy_button(payload)), "fantasy"
 
 
 def build_gift_received_message(payload: dict):
-    text = f"🎁 {esc(payload['sender_name'])} подарил(а) вам «{esc(payload['item_name'])}»!"
+    text = f"🎁 {esc(payload['sender_name'])} подарил(а) тебе «{esc(payload['item_name'])}»!"
     if payload.get("message"):
         text += f"\n«{esc(payload['message'])}»"
     row = [types.InlineKeyboardButton("🎁 Мои подарки", callback_data=cb("gift", "inbox"))]
@@ -105,7 +106,7 @@ def build_gift_received_message(payload: dict):
 def build_season_award_message(payload: dict):
     text = (
         f"🏆 Сезон «{esc(payload['season_name'])}»: место #{payload['rank']} — "
-        f"+{fmt_money(payload['amount'])} монет!"
+        f"+{i18n.fmt_coins(payload['amount'])}!"
     )
     season_id = payload.get("season_id")
     row = [types.InlineKeyboardButton("📈 Рейтинг сезона", callback_data=cb("season", "detail", season_id))] if season_id else []
@@ -114,9 +115,11 @@ def build_season_award_message(payload: dict):
 
 def build_game_finished_message(payload: dict):
     icon = "✅" if payload["won"] else "❌"
-    text = f"{icon} Игра завершена — {payload['total_score']} балл."
+    text = f"{icon} Игра завершена — {i18n.fmt_points(payload['total_score'])}."
     if payload.get("bonus_score"):
-        text += f" (бонус {payload['bonus_score']:+.1f})"
+        bonus = payload["bonus_score"]
+        sign = "+" if bonus >= 0 else ""
+        text += f" (бонус {sign}{i18n.fmt_score(bonus)})"
     game_id = payload.get("game_id")
     row = [types.InlineKeyboardButton("🎮 Открыть игру", callback_data=cb("game", "detail", game_id))] if game_id else []
     return text, _markup(row), "game"

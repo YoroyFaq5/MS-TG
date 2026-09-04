@@ -60,7 +60,7 @@ def handle_stats(message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "profile", "open"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_profile_open(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -71,7 +71,7 @@ def handle_profile_open(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "profile", "stats"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_profile_stats(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -82,7 +82,7 @@ def handle_profile_stats(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "profile", "achievements"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_profile_achievements(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -93,7 +93,7 @@ def handle_profile_achievements(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "profile", "balance"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_profile_balance(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -105,7 +105,7 @@ def handle_profile_balance(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "profile", "account"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_profile_account(call) -> None:
     telegram_id = call.from_user.id
     data = resolve(api_client, telegram_id)

@@ -14,14 +14,14 @@ def _edit(call, text, markup):
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "notif", "settings"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_notif_settings(call) -> None:
     prefs = storage.get_notification_prefs(call.from_user.id)
     _edit(call, *build_notification_settings_message(prefs))
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "notif", "toggle"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_notif_toggle(call) -> None:
     _, _, category = parse_cb(call.data)
     telegram_id = call.from_user.id

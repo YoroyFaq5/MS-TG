@@ -43,7 +43,7 @@ def test_build_fantasy_hub_with_draft_shows_my_draft_button():
     text, markup = build_fantasy_hub_message(3, 0, False, "Cup", draft)
     all_cb = [b.callback_data for row in markup.keyboard for b in row]
     assert scope_cb("my", 3, 0, False) in all_cb
-    assert "open" in text
+    assert "открыт" in text  # draft_status "open" translated, not raw English
 
 
 def test_build_fantasy_hub_practice_toggle_switches_mode():

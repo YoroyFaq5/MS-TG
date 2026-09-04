@@ -26,3 +26,36 @@ def check_rate_limit(key: str, limit: int = _DEFAULT_LIMIT, window_seconds: floa
         return False
     bucket.append(now)
     return True
+
+
+# ── Group-command antispam (CLAUDE_TASK_BOT_RU_GROUPS.md, раздел 7) ─────────
+# Two windows per (chat_id, user_id) — a tight short-burst cap and a looser
+# longer one — configured via bot/config.py so an operator can tune them
+# without a code change. Separate from check_rate_limit() above (that one
+# guards the two webhook routes themselves, keyed differently).
+
+_last_group_warning: dict[str, float] = {}
+
+
+def check_group_command_rate_limit(chat_id: int, user_id: int) -> tuple[bool, bool]:
+    """Returns (allowed, should_warn). should_warn is True at most once per
+    short window even if the caller keeps sending commands past the limit —
+    "отвечать тихим коротким сообщением не чаще одного раза за окно"."""
+    from bot.config import Config
+
+    key = f"group:{chat_id}:{user_id}"
+    short_ok = check_rate_limit(
+        f"{key}:s", Config.GROUP_COMMAND_LIMIT_SHORT, Config.GROUP_COMMAND_WINDOW_SHORT_SECONDS,
+    )
+    long_ok = check_rate_limit(
+        f"{key}:l", Config.GROUP_COMMAND_LIMIT_LONG, Config.GROUP_COMMAND_WINDOW_LONG_SECONDS,
+    )
+    if short_ok and long_ok:
+        return True, False
+
+    now = time.monotonic()
+    last = _last_group_warning.get(key, 0.0)
+    should_warn = (now - last) >= Config.GROUP_COMMAND_WINDOW_SHORT_SECONDS
+    if should_warn:
+        _last_group_warning[key] = now
+    return False, should_warn

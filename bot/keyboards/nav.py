@@ -30,14 +30,25 @@ CALLBACK_MAX_BYTES = 64
 NOOP = "v1:noop"
 
 
+class CallbackDataTooLong(ValueError):
+    """Raised by cb() when the encoded string would exceed Telegram's
+    64-byte callback_data limit (CLAUDE_TASK_BOT_RU_GROUPS.md, п.5.4) —
+    Telegram itself would silently refuse to attach such a button, which
+    used to surface as a mysteriously dead button days later. Raising here
+    instead means: a test or a dev run catches the bug immediately at its
+    source, and in production the surrounding guarded_callback()/handler
+    error handling turns it into one friendly "не удалось выполнить
+    действие" message instead of a keyboard with a button that does
+    nothing when tapped."""
+
+
 def cb(*parts: object) -> str:
     """Build a versioned callback_data string: cb("shop", "item", 42) ->
-    "v1:shop:item:42". Logs (does not raise) if the result would exceed
-    Telegram's 64-byte limit — that's a bug to fix at the call site, but a
-    dead button is much better than a crashed handler in production."""
+    "v1:shop:item:42"."""
     data = "v1:" + ":".join(str(p) for p in parts)
     if len(data.encode("utf-8")) > CALLBACK_MAX_BYTES:
         logger.error("callback_data exceeds %d bytes: %r", CALLBACK_MAX_BYTES, data)
+        raise CallbackDataTooLong(data)
     return data
 
 

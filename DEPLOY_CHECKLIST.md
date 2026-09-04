@@ -23,10 +23,22 @@ python migrate_notify_outbox.py
 изменением) — безопасно запускать повторно, в том числе если часть уже
 применена.
 
-**MS-TG** — миграций нет: единственное состояние — локальный SQLite-файл
-`bot/data/bot.db` (или путь из `BOT_DB_PATH`), создаётся автоматически
-`storage.init_db()` при первом запуске `create_app()`. Убедиться, что
-процесс имеет права на запись в директорию файла:
+**MS-TG** — миграций в привычном смысле нет (нет Alembic/файлов
+`migrate_*.py`): единственное состояние — локальный SQLite-файл
+`bot/data/bot.db` (или путь из `BOT_DB_PATH`). `storage.init_db()`
+создаёт всю схему при первом запуске `create_app()` и САМ применяет одну
+встроенную схемную миграцию при обновлении с более старой версии —
+`fsm_state` перешла с `PRIMARY KEY (chat_id)` на составной
+`PRIMARY KEY (chat_id, telegram_user_id)` (нужно для корректного FSM в
+группах — раньше одно состояние на чат путало бы FSM двух разных
+пользователей). Миграция идемпотентна (проверяет наличие колонки
+`telegram_user_id` через `PRAGMA table_info`, ничего не делает при
+повторном запуске) и **не требует ручных действий** — просто выполняется
+при следующем старте процесса, старые строки переносятся с допущением
+`telegram_user_id = chat_id` (верно для всей истории до этого момента,
+т.к. FSM раньше был доступен только в личных чатах, где `chat_id ==
+telegram_user_id`). Убедиться, что процесс имеет права на запись в
+директорию файла:
 
 ```bash
 mkdir -p bot/data && touch bot/data/bot.db && rm bot/data/bot.db  # проверка прав, файл создаст сам процесс
@@ -55,7 +67,13 @@ mkdir -p bot/data && touch bot/data/bot.db && rm bot/data/bot.db  # провер
 - `MAIN_API_SERVICE_TOKEN` — **тот же самый** токен, что в `MAIN_API_SERVICE_TOKEN` на MS.
 - `INCOMING_EVENT_SECRET` — **тот же самый** секрет, что в `INCOMING_EVENT_SECRET` на MS.
 
-Опционально: `BOT_DB_PATH`, `API_CONNECT_TIMEOUT`, `API_READ_TIMEOUT`.
+Опционально: `BOT_DB_PATH`, `API_CONNECT_TIMEOUT`, `API_READ_TIMEOUT`,
+`TELEGRAM_BOT_USERNAME` (кнопки "Открыть в боте" из группового чата — без
+неё бот один раз спросит своё имя через `bot.get_me()` и закеширует),
+`GROUP_COMMAND_LIMIT_SHORT`/`GROUP_COMMAND_WINDOW_SHORT_SECONDS`/
+`GROUP_COMMAND_LIMIT_LONG`/`GROUP_COMMAND_WINDOW_LONG_SECONDS` (антиспам
+публичных команд `/top`, `/season`, `/tournaments`, `/player`,
+`/compare`, `/game`, `/help` в группах — есть безопасный дефолт).
 
 Проверка перед запуском:
 
@@ -120,6 +138,23 @@ curl -s -o /dev/null -w '%{http_code}\n' -X POST \
      https://<MS-TG-домен>/telegram/webhook/<TELEGRAM_WEBHOOK_PATH_TOKEN>
 # ожидаем 403
 ```
+
+## 6б. Регистрация команд Telegram (`/`-меню)
+
+Разные списки команд для личных и групповых чатов
+(`BotCommandScopeAllPrivateChats`/`BotCommandScopeAllGroupChats`, см.
+`bot/commands.py`) — выполнить один раз после каждого деплоя, который
+добавляет/переименовывает команду (идемпотентно, безопасно запускать
+повторно на каждом деплое "на всякий случай"):
+
+```bash
+flask set-commands
+```
+
+Ожидаемый вывод: `Telegram commands: {'private': 'updated'|'unchanged',
+'group': 'updated'|'unchanged'}`. Проверить в самом Telegram: открыть "/"
+в личном чате с ботом — должны быть только `/start` и `/help`; в любой
+группе, куда добавлен бот, — все семь публичных команд.
 
 ## 7. Тестовый запрос к основному сайту (от бота)
 

@@ -13,6 +13,7 @@ import logging
 from bot.telegram_bot import bot
 from bot.presenters.menu import build_main_menu_message, build_reply_keyboard
 from bot.dispatch import guarded_callback
+from bot.chat_policy import require_private_message
 from bot.keyboards.nav import is_cb, parse_cb, NOOP
 from bot import storage
 
@@ -43,22 +44,23 @@ def handle_noop_callback(call) -> None:
 
 
 @bot.message_handler(func=lambda m: m.text == "🏠 Меню")
+@require_private_message
 def menu_reply_button(message) -> None:
-    storage.clear_fsm_state(message.chat.id)
+    storage.clear_fsm_state(message.chat.id, message.from_user.id)
     text, markup = build_main_menu_message()
     bot.send_message(message.chat.id, text, reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "nav", "home"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_nav_home(call) -> None:
-    storage.clear_fsm_state(call.message.chat.id)
+    storage.clear_fsm_state(call.message.chat.id, call.from_user.id)
     text, markup = build_main_menu_message()
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "nav", "open"))
-@guarded_callback(bot)
+@guarded_callback(bot, private_only=True)
 def handle_nav_open(call) -> None:
     # Deliberately NOT answer_immediately here: most branches below delegate
     # to another domain's OWN already-guarded handler (which answers for
@@ -67,7 +69,7 @@ def handle_nav_open(call) -> None:
     # Only the "tourn" branch calls a bare helper instead of a guarded
     # handler, so it answers for itself, first, right below.
     _, _, section = parse_cb(call.data)
-    storage.clear_fsm_state(call.message.chat.id)
+    storage.clear_fsm_state(call.message.chat.id, call.from_user.id)
 
     if section == "profile":
         profile_h.handle_profile_open(call)

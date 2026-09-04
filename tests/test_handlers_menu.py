@@ -3,9 +3,11 @@ from unittest.mock import MagicMock, patch
 from bot.keyboards.nav import cb
 
 
-def _fake_message(chat_id=555, text=""):
+def _fake_message(chat_id=555, text="", from_id=111, chat_type="private"):
     m = MagicMock()
     m.chat.id = chat_id
+    m.chat.type = chat_type
+    m.from_user.id = from_id
     m.text = text
     return m
 
@@ -16,6 +18,7 @@ def _fake_call(data, chat_id=555, message_id=999, from_id=111, call_id="cbid1"):
     call.id = call_id
     call.from_user.id = from_id
     call.message.chat.id = chat_id
+    call.message.chat.type = "private"
     call.message.message_id = message_id
     return call
 
@@ -39,8 +42,20 @@ def test_menu_reply_button_sends_inline_main_menu():
     with patch("bot.telegram_bot.bot.send_message") as mock_send, \
          patch("bot.storage.clear_fsm_state") as mock_clear:
         menu_reply_button(message)
-    mock_clear.assert_called_once_with(555)
+    mock_clear.assert_called_once_with(555, 111)
     assert "Главное меню" in mock_send.call_args[0][1]
+
+
+def test_menu_reply_button_rejected_in_group():
+    from bot.handlers.menu import menu_reply_button
+
+    message = _fake_message(text="🏠 Меню", chat_type="group")
+    with patch("bot.telegram_bot.bot.send_message") as mock_send, \
+         patch("bot.storage.clear_fsm_state") as mock_clear:
+        menu_reply_button(message)
+
+    mock_clear.assert_not_called()
+    assert "личном чате" in mock_send.call_args[0][1]
 
 
 def test_handle_nav_home_edits_message_and_answers():

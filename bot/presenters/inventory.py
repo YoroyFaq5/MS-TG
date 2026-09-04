@@ -2,9 +2,10 @@ from typing import Tuple
 
 from telebot import types
 
+from bot import i18n
 from bot.keyboards.nav import add_nav_footer, cb
 from bot.ui import esc, truncate
-from bot.presenters.shop import CATEGORY_LABELS, RARITY_LABELS
+from bot.presenters.shop import CATEGORY_LABELS
 
 
 def build_inventory_hub_message() -> Tuple[str, types.InlineKeyboardMarkup]:
@@ -23,7 +24,7 @@ def build_inventory_list_message(items: list, category) -> Tuple[str, types.Inli
     for inv in items:
         item = inv["item"]
         equipped_mark = " ✅ экипировано" if inv["is_equipped"] else ""
-        lines.append(f"{esc(item['name'])} ({RARITY_LABELS.get(item['rarity'], item['rarity'])}){equipped_mark}")
+        lines.append(f"{esc(item['name'])} ({i18n.tr('rarity', item['rarity'])}){equipped_mark}")
         if item["category"] != "physical":
             action = "unequip" if inv["is_equipped"] else "equip"
             action_label = "📤 Снять" if inv["is_equipped"] else "🎽 Экипировать"
@@ -37,5 +38,6 @@ def build_inventory_list_message(items: list, category) -> Tuple[str, types.Inli
                 callback_data=cb("gift", "send-pick", inv["id"]),
             ))
     if not items:
-        lines.append("Пусто — загляни в 🛍 Магазин.")
+        lines.append("Пусто — загляни в магазин.")
+        markup.add(types.InlineKeyboardButton("🛍 В магазин", callback_data=cb("shop", "hub")))
     return "\n".join(lines), add_nav_footer(markup, back_target=cb("inv", "hub"))

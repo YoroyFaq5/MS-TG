@@ -2,6 +2,7 @@ from typing import Tuple
 
 from telebot import types
 
+from bot import i18n
 from bot.keyboards.nav import add_nav_footer, cb, pagination_row
 from bot.ui import esc, truncate
 
@@ -18,7 +19,7 @@ def build_gifts_hub_message() -> Tuple[str, types.InlineKeyboardMarkup]:
 def build_inbox_message(data: dict) -> Tuple[str, types.InlineKeyboardMarkup]:
     items = data["items"]
     page, total_pages = data["page"], data["total_pages"] or 1
-    lines = [f"📥 <b>Входящие подарки</b> — стр. {page}/{total_pages}", ""]
+    lines = [f"📥 <b>Входящие подарки</b> — {i18n.page_indicator(page, total_pages)}", ""]
     for t in items:
         seen_mark = "" if t["seen"] else " 🆕"
         item_name = t["shop_item"]["name"] if t.get("shop_item") else "?"
@@ -36,7 +37,7 @@ def build_inbox_message(data: dict) -> Tuple[str, types.InlineKeyboardMarkup]:
 def build_history_message(data: dict) -> Tuple[str, types.InlineKeyboardMarkup]:
     items = data["items"]
     page, total_pages = data["page"], data["total_pages"] or 1
-    lines = [f"📜 <b>История подарков</b> — стр. {page}/{total_pages}", ""]
+    lines = [f"📜 <b>История подарков</b> — {i18n.page_indicator(page, total_pages)}", ""]
     for t in items:
         item_name = t["shop_item"]["name"] if t.get("shop_item") else "?"
         lines.append(f"{esc(t['from_player_name'])} → {esc(t['to_player_name'])}: «{esc(item_name)}»")
@@ -65,21 +66,21 @@ def build_ask_recipient_message() -> Tuple[str, types.InlineKeyboardMarkup]:
     text = "👤 Напиши ник получателя одним сообщением."
     markup = types.InlineKeyboardMarkup()
     markup.row(types.InlineKeyboardButton("✖️ Отмена", callback_data=cb("gift", "cancel")))
-    return text, markup
+    return text, add_nav_footer(markup, back_target=cb("gift", "hub"))
 
 
 def build_recipient_results_message(candidates: list, query: str) -> Tuple[str, types.InlineKeyboardMarkup]:
     markup = types.InlineKeyboardMarkup()
     for p in candidates:
         markup.add(types.InlineKeyboardButton(
-            f"{p['display_name']} (ELO {round(p['elo'])})", callback_data=cb("gift", "recip", p["id"]),
+            f"{p['display_name']} (Эло {round(p['elo'])})", callback_data=cb("gift", "recip", p["id"]),
         ))
     if candidates:
         text = f"Похожие на «{esc(query)}»:"
     else:
         text = f"Никого не нашлось по «{esc(query)}». Попробуй ещё раз или отмени."
     markup.row(types.InlineKeyboardButton("✖️ Отмена", callback_data=cb("gift", "cancel")))
-    return text, markup
+    return text, add_nav_footer(markup, back_target=cb("gift", "hub"))
 
 
 def build_ask_note_message(recipient_name: str) -> Tuple[str, types.InlineKeyboardMarkup]:
@@ -87,7 +88,7 @@ def build_ask_note_message(recipient_name: str) -> Tuple[str, types.InlineKeyboa
     markup = types.InlineKeyboardMarkup()
     markup.row(types.InlineKeyboardButton("⏭ Без заметки", callback_data=cb("gift", "skip-note")))
     markup.row(types.InlineKeyboardButton("✖️ Отмена", callback_data=cb("gift", "cancel")))
-    return text, markup
+    return text, add_nav_footer(markup, back_target=cb("gift", "hub"))
 
 
 def build_confirm_message(item_name: str, recipient_name: str, note: str) -> Tuple[str, types.InlineKeyboardMarkup]:
@@ -103,7 +104,7 @@ def build_confirm_message(item_name: str, recipient_name: str, note: str) -> Tup
         types.InlineKeyboardButton("✅ Отправить", callback_data=cb("gift", "confirm")),
         types.InlineKeyboardButton("✖️ Отмена", callback_data=cb("gift", "cancel")),
     )
-    return "\n".join(lines), markup
+    return "\n".join(lines), add_nav_footer(markup, back_target=cb("gift", "hub"))
 
 
 def build_sent_message(item_name: str, recipient_name: str) -> Tuple[str, types.InlineKeyboardMarkup]:

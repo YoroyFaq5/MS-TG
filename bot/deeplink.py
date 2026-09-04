@@ -51,6 +51,7 @@ _PATTERNS = {
     "shop": re.compile(r"^shop$"),
     "shop_item": re.compile(rf"^item{_INT}$"),
     "gift": re.compile(r"^gift$"),
+    "rating": re.compile(r"^rating$"),
 }
 
 
@@ -168,6 +169,11 @@ def _gift() -> Tuple[str, types.InlineKeyboardMarkup]:
     return build_gifts_hub_message()
 
 
+def _rating() -> Tuple[str, types.InlineKeyboardMarkup]:
+    from bot.presenters.seasons import build_ratings_hub_message
+    return build_ratings_hub_message()
+
+
 def resolve_deep_link(payload: str, telegram_id: int) -> Optional[Tuple[str, types.InlineKeyboardMarkup]]:
     payload = (payload or "").strip()
     if not payload:
@@ -175,6 +181,9 @@ def resolve_deep_link(payload: str, telegram_id: int) -> Optional[Tuple[str, typ
 
     if _PATTERNS["gift"].match(payload):
         return _gift()
+
+    if _PATTERNS["rating"].match(payload):
+        return _rating()
 
     m = _PATTERNS["game"].match(payload)
     if m:

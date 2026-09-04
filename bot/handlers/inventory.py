@@ -21,13 +21,13 @@ def _edit(call, text, markup):
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "inv", "hub"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_inventory_hub(call) -> None:
     _edit(call, *build_inventory_hub_message())
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "inv", "list"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_inventory_list(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -40,7 +40,7 @@ def handle_inventory_list(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "inv", "equip"))
-@guarded_callback(bot, sensitive=True)
+@guarded_callback(bot, sensitive=True, private_only=True)
 def handle_inventory_equip(call) -> None:
     _, _, inventory_item_id, category_raw = parse_cb(call.data)
     category = _cat(category_raw)
@@ -57,7 +57,7 @@ def handle_inventory_equip(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "inv", "unequip"))
-@guarded_callback(bot, sensitive=True)
+@guarded_callback(bot, sensitive=True, private_only=True)
 def handle_inventory_unequip(call) -> None:
     _, _, inventory_item_id, category_raw = parse_cb(call.data)
     category = _cat(category_raw)

@@ -17,6 +17,7 @@ os.environ.setdefault("TELEGRAM_WEBHOOK_PATH_TOKEN", "test-path-token")
 os.environ.setdefault("MAIN_API_BASE_URL", "http://localhost:9999")
 os.environ.setdefault("MAIN_API_SERVICE_TOKEN", "test-service-token")
 os.environ.setdefault("INCOMING_EVENT_SECRET", "test-event-secret")
+os.environ.setdefault("TELEGRAM_BOT_USERNAME", "test_bot")
 
 # bot/storage.py (FSM state, double-tap locks, notification prefs, outbox
 # event dedup) needs its SQLite file/tables to exist before any test that
@@ -30,6 +31,20 @@ os.environ.setdefault("BOT_DB_PATH", os.path.join(_tmp_db_dir, "test_bot.db"))
 from bot import storage  # noqa: E402
 
 storage.init_db()
+
+
+@pytest.fixture(autouse=True)
+def _clear_rate_limit_buckets():
+    """Same isolation problem as action_locks below, for the in-process
+    rate limiter: many tests reuse the same fake (chat_id, user_id), so
+    without a reset a group-command test could trip
+    check_group_command_rate_limit() from an unrelated earlier test's
+    calls within the same short window."""
+    from bot import ratelimit
+
+    ratelimit._buckets.clear()
+    ratelimit._last_group_warning.clear()
+    yield
 
 
 @pytest.fixture(autouse=True)

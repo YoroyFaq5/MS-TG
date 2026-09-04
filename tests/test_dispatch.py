@@ -127,6 +127,55 @@ def test_answer_immediately_failure_sends_message_instead_of_second_answer():
     bot.send_message.assert_called_once()
 
 
+def test_private_only_rejects_group_callback_without_running_handler():
+    bot = MagicMock()
+    handler = MagicMock()
+    wrapped = guarded_callback(bot, private_only=True)(handler)
+
+    call = _fake_call()
+    call.message.chat.type = "group"
+    wrapped(call)
+
+    handler.assert_not_called()
+    bot.answer_callback_query.assert_called_once()
+    args, kwargs = bot.answer_callback_query.call_args
+    assert args[0] == "cbid"
+    assert kwargs.get("show_alert") is True
+
+
+def test_private_only_allows_private_chat_callback():
+    bot = MagicMock()
+    handler = MagicMock()
+    wrapped = guarded_callback(bot, private_only=True, answer_immediately=True)(handler)
+
+    call = _fake_call()
+    call.message.chat.type = "private"
+    wrapped(call)
+
+    handler.assert_called_once()
+
+
+def test_private_only_does_not_touch_sensitive_lock_when_rejected():
+    """A group tap on a private_only+sensitive callback must not acquire
+    (or later appear to be blocking) the double-tap lock — it's rejected
+    before the lock logic runs at all."""
+    bot = MagicMock()
+    handler = MagicMock()
+    wrapped = guarded_callback(bot, sensitive=True, private_only=True)(handler)
+
+    group_call = _fake_call(data="v1:shop:buy:1")
+    group_call.message.chat.type = "group"
+    wrapped(group_call)
+    handler.assert_not_called()
+
+    # The same actor/action from a private chat right after must still work
+    # normally — proves no lock was left behind by the rejected group tap.
+    private_call = _fake_call(data="v1:shop:buy:1")
+    private_call.message.chat.type = "private"
+    wrapped(private_call)
+    handler.assert_called_once()
+
+
 def test_answer_immediately_skipped_for_noop_and_locked_paths():
     bot = MagicMock()
     handler = MagicMock()

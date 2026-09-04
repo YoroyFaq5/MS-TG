@@ -62,18 +62,60 @@ def _conn() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+def _migrate_fsm_state_schema(conn: sqlite3.Connection) -> None:
+    """fsm_state used to be keyed by chat_id alone — unusable once a group
+    chat can have several users each mid-scenario at once (they'd stomp on
+    each other's state). Composite-key it on (chat_id, telegram_user_id)
+    instead (CLAUDE_TASK_BOT_RU_GROUPS.md, п.2.3).
+
+    Lossless backfill: every row that existed under the old schema was
+    necessarily created in a PRIVATE chat (FSM never ran anywhere else
+    before this migration) — and Telegram's own convention makes a private
+    chat's chat_id equal to the user's telegram_id. So telegram_user_id =
+    chat_id is exact, not a guess, for every pre-existing row."""
+    table_exists = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='fsm_state'"
+    ).fetchone()
+    if not table_exists:
+        return  # fresh install — the CREATE TABLE below already uses the new schema
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(fsm_state)").fetchall()]
+    if "telegram_user_id" in cols:
+        return  # already migrated
+
+    conn.execute("ALTER TABLE fsm_state RENAME TO fsm_state_old")
+    conn.execute(
+        """CREATE TABLE fsm_state (
+            chat_id INTEGER NOT NULL,
+            telegram_user_id INTEGER NOT NULL,
+            scenario TEXT NOT NULL,
+            step TEXT NOT NULL,
+            data TEXT NOT NULL DEFAULT '{}',
+            updated_at REAL NOT NULL,
+            PRIMARY KEY (chat_id, telegram_user_id)
+        )"""
+    )
+    conn.execute(
+        """INSERT INTO fsm_state (chat_id, telegram_user_id, scenario, step, data, updated_at)
+           SELECT chat_id, chat_id, scenario, step, data, updated_at FROM fsm_state_old"""
+    )
+    conn.execute("DROP TABLE fsm_state_old")
+
+
 def init_db() -> None:
     """Create tables if missing — idempotent, safe to call on every boot
     (same spirit as the main site's ensure_year_exists), and explicitly
     called once from tests/conftest.py against a temp file per test run."""
     with _conn() as conn:
+        _migrate_fsm_state_schema(conn)
         conn.execute(
             """CREATE TABLE IF NOT EXISTS fsm_state (
-                chat_id INTEGER PRIMARY KEY,
+                chat_id INTEGER NOT NULL,
+                telegram_user_id INTEGER NOT NULL,
                 scenario TEXT NOT NULL,
                 step TEXT NOT NULL,
                 data TEXT NOT NULL DEFAULT '{}',
-                updated_at REAL NOT NULL
+                updated_at REAL NOT NULL,
+                PRIMARY KEY (chat_id, telegram_user_id)
             )"""
         )
         conn.execute(
@@ -100,10 +142,11 @@ def init_db() -> None:
 
 # ── FSM state (multi-step scenarios: gift-sending, etc.) ────────────────────
 
-def get_fsm_state(chat_id: int) -> Optional[dict]:
+def get_fsm_state(chat_id: int, telegram_user_id: int) -> Optional[dict]:
     with _conn() as conn:
         row = conn.execute(
-            "SELECT scenario, step, data FROM fsm_state WHERE chat_id = ?", (chat_id,)
+            "SELECT scenario, step, data FROM fsm_state WHERE chat_id = ? AND telegram_user_id = ?",
+            (chat_id, telegram_user_id),
         ).fetchone()
     if not row:
         return None
@@ -115,21 +158,25 @@ def get_fsm_state(chat_id: int) -> Optional[dict]:
     return {"scenario": scenario, "step": step, "data": payload}
 
 
-def set_fsm_state(chat_id: int, scenario: str, step: str, data: Optional[dict] = None) -> None:
+def set_fsm_state(
+    chat_id: int, telegram_user_id: int, scenario: str, step: str, data: Optional[dict] = None,
+) -> None:
     with _conn() as conn:
         conn.execute(
-            """INSERT INTO fsm_state (chat_id, scenario, step, data, updated_at)
-               VALUES (?, ?, ?, ?, ?)
-               ON CONFLICT(chat_id) DO UPDATE SET
+            """INSERT INTO fsm_state (chat_id, telegram_user_id, scenario, step, data, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(chat_id, telegram_user_id) DO UPDATE SET
                    scenario=excluded.scenario, step=excluded.step,
                    data=excluded.data, updated_at=excluded.updated_at""",
-            (chat_id, scenario, step, json.dumps(data or {}), time.time()),
+            (chat_id, telegram_user_id, scenario, step, json.dumps(data or {}), time.time()),
         )
 
 
-def clear_fsm_state(chat_id: int) -> None:
+def clear_fsm_state(chat_id: int, telegram_user_id: int) -> None:
     with _conn() as conn:
-        conn.execute("DELETE FROM fsm_state WHERE chat_id = ?", (chat_id,))
+        conn.execute(
+            "DELETE FROM fsm_state WHERE chat_id = ? AND telegram_user_id = ?", (chat_id, telegram_user_id),
+        )
 
 
 # ── Double-tap / duplicate-submission guard ──────────────────────────────────
@@ -203,7 +250,7 @@ NOTIFICATION_CATEGORIES: dict[str, str] = {
     "game": "🎮 Завершение моей игры",
     "rating": "📈 Изменение рейтинга/места сезона",
     "award": "🎖 Достижение или титул",
-    "fantasy": "🎯 Fantasy: блокировка, результат, приз",
+    "fantasy": "🎯 Фэнтези: блокировка, результат, приз",
     "gift": "🎁 Подарок",
     "shop": "🛍 Покупка/перекуп предмета",
     "season": "🏁 Сезонная награда и «Стол года»",

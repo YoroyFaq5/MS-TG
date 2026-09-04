@@ -73,16 +73,16 @@ def build_vs_picker_message(items: List[dict], self_player_id: int) -> Tuple[str
 
 
 def build_vs_search_prompt_message() -> Tuple[str, types.InlineKeyboardMarkup]:
-    from bot.keyboards.nav import cb
+    from bot.keyboards.nav import add_nav_footer, cb
 
     text = "🔍 Напиши ник соперника одним сообщением."
     markup = types.InlineKeyboardMarkup()
     markup.row(types.InlineKeyboardButton("✖️ Отмена", callback_data=cb("vs", "hub")))
-    return text, markup
+    return text, add_nav_footer(markup, back_target=cb("vs", "hub"))
 
 
 def build_vs_search_results_message(candidates: list, query: str) -> Tuple[str, types.InlineKeyboardMarkup]:
-    from bot.keyboards.nav import cb
+    from bot.keyboards.nav import add_nav_footer, cb
     from bot.ui import esc
 
     markup = types.InlineKeyboardMarkup()
@@ -92,7 +92,7 @@ def build_vs_search_results_message(candidates: list, query: str) -> Tuple[str, 
         ))
     text = f"Похожие на «{esc(query)}»:" if candidates else f"Никого не нашлось по «{esc(query)}»."
     markup.row(types.InlineKeyboardButton("✖️ Отмена", callback_data=cb("vs", "hub")))
-    return text, markup
+    return text, add_nav_footer(markup, back_target=cb("vs", "hub"))
 
 
 def build_vs_message(data: dict) -> Tuple[str, Optional[types.InlineKeyboardMarkup]]:

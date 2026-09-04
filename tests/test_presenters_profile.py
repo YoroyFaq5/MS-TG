@@ -6,13 +6,16 @@ from bot.presenters.profile import (
 def test_build_not_linked_message():
     text, markup = build_not_linked_message()
     assert "не привязан" in text
-    assert markup is None
+    # UX fix (CLAUDE_TASK_BOT_RU_GROUPS.md п.5.2): a real link button, not
+    # just an instruction in plain text.
+    buttons = [b for row in markup.keyboard for b in row]
+    assert any(b.url and "/profile/" in b.url for b in buttons)
 
 
 def test_build_welcome_back_message():
     text, markup = build_welcome_back_message("Alice")
     assert "Alice" in text
-    assert "Кто круче" in text
+    assert "Сравнить игроков" in text
 
 
 def test_build_profile_card_basic():
@@ -30,7 +33,7 @@ def test_build_profile_card_basic():
     text, markup = build_profile_card(data)
     assert "Alice" in text
     assert "#3" in text
-    assert "60.0%" in text
+    assert "60%" in text
     assert markup is None
 
 

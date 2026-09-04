@@ -32,13 +32,19 @@ bot/
   config.py          # конфигурация из переменных окружения
   telegram_bot.py     # синглтоны TeleBot и ApiClient
   handlers/            # Telegram-хендлеры (тонкие — парсинг апдейта → services → presenters → отправка)
+    group_commands.py    # публичные команды общего чата: /top, /season, /player, /game, /help
   presenters/          # чистые функции: данные → (текст, клавиатура), без сети
+    group.py             # компактные экраны для группового чата (без пагинации, без callback на private_only)
   services/            # бизнес-правила бота (склейка handlers ↔ api_client)
   api_client/          # единственное место HTTP-вызовов к основному сайту
   webhooks/            # обработка входящих событий ОТ основного сайта
   keyboards/nav.py      # версионированный callback_data, Назад/Домой, пагинация
-  dispatch.py           # guarded_callback — общий wrapper колбэков (double-tap, гарантированный answer)
-  storage.py            # локальный SQLite: FSM, дедуп событий, настройки уведомлений
+  dispatch.py           # guarded_callback — общий wrapper колбэков (double-tap, гарантированный answer, private_only)
+  chat_policy.py         # private-vs-group политика: is_private/is_group, require_private_message
+  i18n.py                # единый слой русской локализации/форматирования (статусы, монеты, баллы, даты, склонения)
+  commands.py            # setMyCommands по scope (личные/групповые команды), см. `flask set-commands`
+  bot_identity.py        # @username бота, deep-link URL в личный чат из группового экрана
+  storage.py            # локальный SQLite: FSM (chat_id, telegram_user_id), дедуп событий, настройки уведомлений
   deeplink.py            # /start <payload> → конкретный экран
   ui.py                  # esc()/форматирование — общая "дизайн-система" пресентеров
   security.py          # проверка подписи вебхука Telegram и HMAC входящих событий

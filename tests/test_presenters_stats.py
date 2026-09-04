@@ -27,9 +27,9 @@ def test_build_stats_message_includes_core_fields():
     data = {"stats": _base_stats(), "comparison_stats": None}
     text, markup = build_stats_message(data)
     assert "Alice" in text
-    assert "60.0%" in text
+    assert "60%" in text
     assert "Точность ЛХ: 66.7%" in text
-    assert "2026-06-21" in text
+    assert "21.06.2026" in text  # русский формат даты, не сырой ISO-срез
     assert markup is not None  # nav footer (Home) is always present
 
 
@@ -51,4 +51,4 @@ def test_build_stats_message_with_comparison():
     }
     text, _ = build_stats_message(data)
     assert "#2 из 10" in text
-    assert "80.0%" in text
+    assert "80%" in text

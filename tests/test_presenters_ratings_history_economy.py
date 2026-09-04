@@ -11,7 +11,7 @@ def test_build_ratings_message():
         "page": 1, "total_pages": 2,
     }
     text, markup = build_ratings_message(data, "global")
-    assert "Alice" in text and "60.0%" in text
+    assert "Alice" in text and "60%" in text
     assert "1/2" in text
     all_buttons = [b for row in markup.keyboard for b in row]
     assert any(b.callback_data == cb("nav", "home") for b in all_buttons)  # always present
@@ -49,7 +49,7 @@ def test_build_history_message():
         "page": 1, "per_page": 10,
     }
     text, markup = build_history_message(data)
-    assert "2026-06-21" in text
+    assert "21.06.2026" in text  # русский формат даты
     assert "✅" in text
     assert "🎯" in text
     all_cb = [b.callback_data for row in markup.keyboard for b in row]
@@ -78,8 +78,8 @@ def test_build_history_message_empty_still_has_way_back():
 def test_build_balance_message():
     history = [{"created_at": "2026-06-21T00:00:00+00:00", "amount": 25.0, "reason": "welcome bonus"}]
     text, markup = build_balance_message(100.0, history)
-    assert "100.0" in text
-    assert "+25.0" in text
+    assert "100 монет" in text  # монеты — целыми, без ₽ и без 100.0
+    assert "+25 монет" in text
     assert "welcome bonus" in text
     assert markup is not None
 
@@ -101,7 +101,10 @@ def test_build_achievements_message():
     assert "📌" in text
     assert "Hidden" not in text  # not unlocked, shouldn't be listed
     all_buttons = [b for row in markup.keyboard for b in row]
-    action_buttons = [b for b in all_buttons if b.callback_data == "ach:unpin:1"]
+    # Versioned callback_data (CLAUDE_TASK_BOT_RU_GROUPS.md п.5.3) — not the
+    # old raw "ach:unpin:1" (still handled for backward compat, see
+    # bot/handlers/achievements.py, but no longer emitted by the presenter).
+    action_buttons = [b for b in all_buttons if b.callback_data == cb("ach", "unpin", 1)]
     assert len(action_buttons) == 1
 
 

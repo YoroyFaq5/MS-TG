@@ -16,11 +16,11 @@ def build_inline_results(players: list) -> List[types.InlineQueryResultArticle]:
     results = []
     for p in players:
         elo = round(p["elo"])
-        text = f"👤 <b>{esc(p['display_name'])}</b> — ELO {elo}"
+        text = f"👤 <b>{esc(p['display_name'])}</b> — Эло {elo}"
         results.append(types.InlineQueryResultArticle(
             id=str(p["id"]),
             title=p["display_name"],
-            description=f"ELO {elo}",
+            description=f"Эло {elo}",
             input_message_content=types.InputTextMessageContent(text, parse_mode="HTML"),
         ))
     return results

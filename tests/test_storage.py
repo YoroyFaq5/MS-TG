@@ -6,10 +6,44 @@ test DB initialized once in conftest.py (BOT_DB_PATH), scoped per test via
 random chat_id/keys so tests don't interfere with each other.
 """
 import itertools
+import sqlite3
 
 from bot import storage
 
 _ids = itertools.count(900_000)
+
+
+def test_fsm_state_schema_migration_backfills_user_id_from_chat_id():
+    """A pre-migration DB has fsm_state keyed by chat_id alone. Since FSM
+    only ever ran in private chats before this migration, chat_id IS the
+    user's telegram_id there (Telegram's own convention) — the migration
+    must backfill telegram_user_id = chat_id losslessly, not drop the row."""
+    old_chat_id = 777_777
+
+    with sqlite3.connect(storage.DB_PATH) as conn:
+        conn.execute("DROP TABLE IF EXISTS fsm_state")
+        conn.execute(
+            """CREATE TABLE fsm_state (
+                chat_id INTEGER PRIMARY KEY,
+                scenario TEXT NOT NULL,
+                step TEXT NOT NULL,
+                data TEXT NOT NULL DEFAULT '{}',
+                updated_at REAL NOT NULL
+            )"""
+        )
+        conn.execute(
+            "INSERT INTO fsm_state (chat_id, scenario, step, data, updated_at) VALUES (?, ?, ?, ?, ?)",
+            (old_chat_id, "gift_send", "await_note", '{"to_player_id": 3}', 0.0),
+        )
+
+    storage.init_db()  # must run the migration idempotently
+
+    state = storage.get_fsm_state(old_chat_id, old_chat_id)
+    assert state == {"scenario": "gift_send", "step": "await_note", "data": {"to_player_id": 3}}
+
+    # Idempotent — calling init_db() again must not error or duplicate/lose the row.
+    storage.init_db()
+    assert storage.get_fsm_state(old_chat_id, old_chat_id) is not None
 
 
 def _chat_id():
@@ -18,27 +52,47 @@ def _chat_id():
 
 def test_fsm_state_round_trip():
     chat_id = _chat_id()
-    assert storage.get_fsm_state(chat_id) is None
+    assert storage.get_fsm_state(chat_id, chat_id) is None
 
-    storage.set_fsm_state(chat_id, "gift_send", "await_recipient", {"inventory_item_id": 5})
-    state = storage.get_fsm_state(chat_id)
+    storage.set_fsm_state(chat_id, chat_id, "gift_send", "await_recipient", {"inventory_item_id": 5})
+    state = storage.get_fsm_state(chat_id, chat_id)
     assert state == {"scenario": "gift_send", "step": "await_recipient", "data": {"inventory_item_id": 5}}
 
 
 def test_fsm_state_overwrite():
     chat_id = _chat_id()
-    storage.set_fsm_state(chat_id, "gift_send", "await_recipient", {})
-    storage.set_fsm_state(chat_id, "gift_send", "await_note", {"to_player_id": 9})
-    state = storage.get_fsm_state(chat_id)
+    storage.set_fsm_state(chat_id, chat_id, "gift_send", "await_recipient", {})
+    storage.set_fsm_state(chat_id, chat_id, "gift_send", "await_note", {"to_player_id": 9})
+    state = storage.get_fsm_state(chat_id, chat_id)
     assert state["step"] == "await_note"
     assert state["data"] == {"to_player_id": 9}
 
 
 def test_fsm_state_clear():
     chat_id = _chat_id()
-    storage.set_fsm_state(chat_id, "gift_send", "await_recipient", {})
-    storage.clear_fsm_state(chat_id)
-    assert storage.get_fsm_state(chat_id) is None
+    storage.set_fsm_state(chat_id, chat_id, "gift_send", "await_recipient", {})
+    storage.clear_fsm_state(chat_id, chat_id)
+    assert storage.get_fsm_state(chat_id, chat_id) is None
+
+
+def test_fsm_state_isolated_per_user_in_same_chat():
+    """CLAUDE_TASK_BOT_RU_GROUPS.md п.2.3: two different users' scenarios
+    in the SAME chat (a group, in principle) must not collide — the old
+    chat_id-only key would have let one user's state clobber another's."""
+    chat_id = _chat_id()
+    user_a, user_b = 111111, 222222
+
+    storage.set_fsm_state(chat_id, user_a, "gift_send", "await_recipient", {"inventory_item_id": 1})
+    storage.set_fsm_state(chat_id, user_b, "gift_send", "await_note", {"to_player_id": 9})
+
+    state_a = storage.get_fsm_state(chat_id, user_a)
+    state_b = storage.get_fsm_state(chat_id, user_b)
+    assert state_a["step"] == "await_recipient" and state_a["data"] == {"inventory_item_id": 1}
+    assert state_b["step"] == "await_note" and state_b["data"] == {"to_player_id": 9}
+
+    storage.clear_fsm_state(chat_id, user_a)
+    assert storage.get_fsm_state(chat_id, user_a) is None
+    assert storage.get_fsm_state(chat_id, user_b) is not None  # untouched
 
 
 def test_action_lock_blocks_second_acquisition_within_ttl():

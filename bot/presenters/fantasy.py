@@ -1,5 +1,5 @@
 """
-Fantasy screens. Every scope-carrying callback encodes exactly
+Фэнтези-экраны. Every scope-carrying callback encodes exactly
 (tournament_id, series_id_or_0, is_practice_0_or_1) as three trailing
 ints — the bot never needs its own copy of "which draft is this", it just
 re-resolves the caller's draft (if any) for that scope via
@@ -10,6 +10,7 @@ from typing import Optional, Tuple
 
 from telebot import types
 
+from bot import i18n
 from bot.keyboards.nav import add_nav_footer, cb
 from bot.ui import esc, truncate
 
@@ -19,7 +20,7 @@ def scope_cb(action: str, tournament_id: int, series_id: int = 0, is_practice: b
 
 
 def build_fantasy_events_message(data: dict) -> Tuple[str, types.InlineKeyboardMarkup]:
-    text = "🎯 <b>Fantasy</b>\n\nВыбери турнир или вечер серии для драфта:"
+    text = "🎯 <b>Фэнтези</b>\n\nВыбери турнир или вечер серии для драфта:"
     markup = types.InlineKeyboardMarkup()
 
     for item in data.get("tournaments", []):
@@ -45,7 +46,7 @@ def build_fantasy_events_message(data: dict) -> Tuple[str, types.InlineKeyboardM
 def _scope_header(tournament_id: int, series_id: int, is_practice: bool, name: str) -> str:
     kind = "🌆 вечер" if series_id else "🏟 турнир"
     mode = " · 🎓 тренировочный" if is_practice else ""
-    return f"🎯 <b>Fantasy — {kind} «{esc(name)}»</b>{mode}"
+    return f"🎯 <b>Фэнтези — {kind} «{esc(name)}»</b>{mode}"
 
 
 def build_fantasy_hub_message(
@@ -53,9 +54,14 @@ def build_fantasy_hub_message(
 ) -> Tuple[str, types.InlineKeyboardMarkup]:
     lines = [_scope_header(tournament_id, series_id, is_practice, name), ""]
     if draft:
-        lines.append(f"Статус: {draft['status']} · Пиков: {draft['pick_count']} · Очки: {draft['total_points']}")
+        status = i18n.tr("draft_status", draft["status"])
+        points = i18n.fmt_count(int(draft["pick_count"]), i18n.picks_word)
+        lines.append(
+            f"Статус: {status} · {points} · "
+            f"{i18n.fmt_points(draft['total_points'])}"
+        )
     else:
-        lines.append("У вас ещё нет драфта здесь.")
+        lines.append("У тебя ещё нет драфта здесь.")
 
     markup = types.InlineKeyboardMarkup()
     if draft:
@@ -83,14 +89,18 @@ def build_fantasy_hub_message(
 def build_my_draft_message(
     draft: dict, tournament_id: int, series_id: int, is_practice: bool,
 ) -> Tuple[str, types.InlineKeyboardMarkup]:
+    status = i18n.tr("draft_status", draft["status"])
     lines = [
-        f"🎯 <b>Мой драфт</b>", f"Статус: {draft['status']} · Очки: {draft['total_points']}", "",
+        "🎯 <b>Мой драфт</b>",
+        f"Статус: {status} · {i18n.fmt_points(draft['total_points'])}",
+        "",
     ]
     markup = types.InlineKeyboardMarkup()
     if draft["picks"]:
         lines.append("Пики:")
         for p in draft["picks"]:
-            lines.append(f"— {esc(p['player_name'])} ({p['points_earned']} очк.)")
+            earned = i18n.fmt_points(p['points_earned'])
+            lines.append(f"— {esc(p['player_name'])} ({earned})")
             if draft["status"] == "open":
                 markup.add(types.InlineKeyboardButton(
                     f"❌ {truncate(p['player_name'], 30)}",
@@ -125,7 +135,7 @@ def build_cancel_confirm_message(
             "✖️ Нет", callback_data=scope_cb("my", tournament_id, series_id, is_practice),
         ),
     )
-    return text, markup
+    return text, add_nav_footer(markup, back_target=scope_cb("my", tournament_id, series_id, is_practice))
 
 
 def build_available_message(
@@ -134,9 +144,10 @@ def build_available_message(
     lines = ["Доступные игроки для пика:", ""]
     markup = types.InlineKeyboardMarkup()
     for p in players:
-        lines.append(f"{esc(p['name'])} (ELO {round(p['elo'])})")
+        elo = round(p["elo"])
+        lines.append(f"{esc(p['name'])} (Эло {elo})")
         markup.add(types.InlineKeyboardButton(
-            f"{truncate(p['name'], 30)} (ELO {round(p['elo'])})",
+            f"{truncate(p['name'], 30)} (Эло {elo})",
             callback_data=cb("fantasy", "pickf", tournament_id, series_id, int(is_practice), p["id"]),
         ))
     if not players:
@@ -149,13 +160,19 @@ def build_available_message(
 def build_leaderboard_message(
     entries: list, name: str, tournament_id: int, series_id: int, is_practice: bool,
 ) -> Tuple[str, types.InlineKeyboardMarkup]:
-    lines = [f"🏆 <b>Fantasy — {esc(name)}</b>", ""]
+    lines = [f"🏆 <b>Фэнтези — {esc(name)}</b>", ""]
     for e in entries:
-        lines.append(f"{e['rank']}. {esc(e['display_name'])} — {e['total_points']} очк. ({e['pick_count']} пиков)")
+        points = i18n.fmt_points(e['total_points'])
+        picks = i18n.fmt_count(e["pick_count"], i18n.picks_word)
+        lines.append(f"{e['rank']}. {esc(e['display_name'])} — {points} ({picks})")
     if not entries:
         lines.append("Пока пусто.")
+    markup = types.InlineKeyboardMarkup()
+    markup.row(types.InlineKeyboardButton(
+        "🔄 Обновить", callback_data=scope_cb("lb", tournament_id, series_id, is_practice),
+    ))
     return "\n".join(lines), add_nav_footer(
-        types.InlineKeyboardMarkup(), back_target=scope_cb("open", tournament_id, series_id, is_practice),
+        markup, back_target=scope_cb("open", tournament_id, series_id, is_practice),
     )
 
 
@@ -163,11 +180,14 @@ def build_history_message(data: dict) -> Tuple[str, types.InlineKeyboardMarkup]:
     items = data["items"]
     page = data["page"]
     total_pages = data["total_pages"] or 1
-    lines = [f"📜 <b>Мои Fantasy-драфты</b> — стр. {page}/{total_pages}", ""]
+    lines = [f"📜 <b>Мои Фэнтези-драфты</b> — {i18n.page_indicator(page, total_pages)}", ""]
     for d in items:
         scope = "🌆 вечер" if d.get("tournament_series_id") else "🏟 турнир"
         mode = " 🎓" if d["is_practice"] else ""
-        lines.append(f"{scope}{mode} · {d['status']} · {d['total_points']} очк. ({d['pick_count']} пиков)")
+        status = i18n.tr("draft_status", d["status"])
+        points = i18n.fmt_points(d['total_points'])
+        picks = i18n.fmt_count(d["pick_count"], i18n.picks_word)
+        lines.append(f"{scope}{mode} · {status} · {points} ({picks})")
     if not items:
         lines.append("Драфтов пока нет.")
 

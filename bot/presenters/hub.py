@@ -7,6 +7,7 @@ from typing import Tuple
 
 from telebot import types
 
+from bot import i18n
 from bot.keyboards.nav import add_nav_footer, cb
 from bot.ui import esc
 
@@ -15,11 +16,13 @@ def build_profile_hub_message(data: dict) -> Tuple[str, types.InlineKeyboardMark
     player = data["player"]
     rank = data.get("global_rank")
     rank_text = f"#{rank}" if rank else "—"
+    games = i18n.fmt_count(data["total_games"], i18n.games_word)
+    wins = i18n.fmt_count(data["total_wins"], i18n.wins_word)
     lines = [
         f"👤 <b>{esc(player['display_name'])}</b>",
-        f"ELO: {round(data.get('elo', player['elo']))} · Место: {rank_text}",
-        f"Игр: {data['total_games']} · Побед: {data['total_wins']} ({data['win_rate']}%)",
-        f"Монет: {round(data.get('coins', 0.0), 2)}",
+        f"Эло: {round(data.get('elo', player['elo']))} · Место: {rank_text}",
+        f"{games} · {wins} ({i18n.fmt_percent(data['win_rate'])})",
+        f"Баланс: {i18n.fmt_coins(data.get('coins', 0.0))}",
     ]
     equipped_title = data.get("equipped_title")
     if equipped_title:

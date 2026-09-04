@@ -19,14 +19,14 @@ def _cat(raw: str):
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "shop", "hub"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_shop_hub(call) -> None:
     text, markup = build_shop_hub_message()
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "shop", "list"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_shop_list(call) -> None:
     _, _, category_raw, page = parse_cb(call.data)
     category = _cat(category_raw)
@@ -37,7 +37,7 @@ def handle_shop_list(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "shop", "item"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_shop_item(call) -> None:
     _, _, item_id, category_raw = parse_cb(call.data)
     category = _cat(category_raw)
@@ -54,7 +54,7 @@ def handle_shop_item(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "shop", "buy-confirm"))
-@guarded_callback(bot, answer_immediately=True)
+@guarded_callback(bot, answer_immediately=True, private_only=True)
 def handle_shop_buy_confirm(call) -> None:
     _, _, item_id, category_raw = parse_cb(call.data)
     category = _cat(category_raw)
@@ -65,7 +65,7 @@ def handle_shop_buy_confirm(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "shop", "buy"))
-@guarded_callback(bot, sensitive=True)
+@guarded_callback(bot, sensitive=True, private_only=True)
 def handle_shop_buy(call) -> None:
     _, _, item_id, category_raw = parse_cb(call.data)
     category = _cat(category_raw)

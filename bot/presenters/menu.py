@@ -15,7 +15,7 @@ MAIN_SECTIONS = [
     ("profile", "👤 Мой кабинет"),
     ("rating", "🏆 Рейтинги"),
     ("tourn", "🎮 Турниры"),
-    ("fantasy", "🎯 Fantasy"),
+    ("fantasy", "🎯 Фэнтези"),
     ("shop", "🛍 Магазин"),
     ("inv", "🎒 Инвентарь"),
     ("gift", "🎁 Подарки"),
@@ -39,4 +39,29 @@ def build_main_menu_message() -> Tuple[str, types.InlineKeyboardMarkup]:
             types.InlineKeyboardButton(label, callback_data=cb("nav", "open", key))
             for key, label in chunk
         ])
+    return text, markup
+
+
+def build_private_help_message() -> Tuple[str, types.InlineKeyboardMarkup]:
+    """/help in a private chat — same command name as the group version
+    (CLAUDE_TASK_BOT_RU_GROUPS.md, раздел 4), different content: the full
+    personal command list instead of the short public one."""
+    text = (
+        "🤖 <b>Команды личного чата</b>\n\n"
+        "/start — открыть меню\n"
+        "/me — профиль\n"
+        "/stats — статистика\n"
+        "/balance — баланс\n"
+        "/history — история игр\n"
+        "/rating — рейтинг\n"
+        "/tournaments — турниры\n"
+        "/compare &lt;ник 1&gt; | &lt;ник 2&gt; — сравнить игроков\n"
+        "/achievements — достижения\n"
+        "/titles — титулы\n"
+        "/unlink — отвязать аккаунт\n\n"
+        "Ниже — главное меню со всеми разделами, включая Фэнтези, "
+        "магазин, инвентарь и подарки."
+    )
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("🏠 Открыть меню", callback_data=cb("nav", "home")))
     return text, markup
