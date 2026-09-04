@@ -95,3 +95,48 @@ def test_sensitive_lock_is_per_actor_and_action():
     wrapped(_fake_call(data="v1:shop:buy:1", from_id=222))  # different user
 
     assert handler.call_count == 3
+
+
+def test_answer_immediately_answers_before_calling_handler():
+    bot = MagicMock()
+    call_order = []
+    bot.answer_callback_query.side_effect = lambda *a, **k: call_order.append("answer")
+    handler = MagicMock(side_effect=lambda call: call_order.append("handler"))
+
+    wrapped = guarded_callback(bot, answer_immediately=True)(handler)
+    wrapped(_fake_call())
+
+    assert call_order == ["answer", "handler"]
+    bot.answer_callback_query.assert_called_once_with("cbid")
+    handler.assert_called_once()
+
+
+def test_answer_immediately_failure_sends_message_instead_of_second_answer():
+    """Once answered up front, a failure can't re-answer the same
+    callback_query — the fallback must be a plain sent message, not a
+    second (guaranteed-to-fail) answer_callback_query call."""
+    bot = MagicMock()
+
+    def handler(call):
+        raise RuntimeError("boom")
+
+    wrapped = guarded_callback(bot, answer_immediately=True)(handler)
+    wrapped(_fake_call())  # must not raise
+
+    bot.answer_callback_query.assert_called_once_with("cbid")  # only the immediate one
+    bot.send_message.assert_called_once()
+
+
+def test_answer_immediately_skipped_for_noop_and_locked_paths():
+    bot = MagicMock()
+    handler = MagicMock()
+    wrapped = guarded_callback(bot, sensitive=True, answer_immediately=True)(handler)
+
+    call_1 = _fake_call(data="v1:shop:buy:1", call_id="a")
+    call_2 = _fake_call(data="v1:shop:buy:1", call_id="b")
+    wrapped(call_1)
+    wrapped(call_2)  # blocked by the double-tap lock — must not ALSO get the immediate answer
+
+    assert handler.call_count == 1
+    # One immediate answer for call_1, one lock-rejection toast for call_2 — never both for call_2.
+    assert bot.answer_callback_query.call_count == 2

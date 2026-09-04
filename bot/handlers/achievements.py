@@ -71,7 +71,7 @@ def handle_titles(message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "ach", "titles"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_titles_callback(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -80,7 +80,6 @@ def handle_titles_callback(call) -> None:
         items = get_titles(api_client, telegram_id)
         text, markup = build_titles_message(items)
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "title", "equip"))

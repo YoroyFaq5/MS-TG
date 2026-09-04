@@ -19,15 +19,14 @@ def _cat(raw: str):
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "shop", "hub"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_shop_hub(call) -> None:
     text, markup = build_shop_hub_message()
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "shop", "list"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_shop_list(call) -> None:
     _, _, category_raw, page = parse_cb(call.data)
     category = _cat(category_raw)
@@ -35,11 +34,10 @@ def handle_shop_list(call) -> None:
     data = get_items(api_client, category=category, telegram_id=telegram_id, page=int(page))
     text, markup = build_shop_list_message(data, category)
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "shop", "item"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_shop_item(call) -> None:
     _, _, item_id, category_raw = parse_cb(call.data)
     category = _cat(category_raw)
@@ -50,15 +48,13 @@ def handle_shop_item(call) -> None:
         bot.edit_message_text(
             stale_state("Товар больше не найден."), call.message.chat.id, call.message.message_id,
         )
-        bot.answer_callback_query(call.id)
         return
     text, markup = build_shop_item_message(item, category)
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "shop", "buy-confirm"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_shop_buy_confirm(call) -> None:
     _, _, item_id, category_raw = parse_cb(call.data)
     category = _cat(category_raw)
@@ -66,7 +62,6 @@ def handle_shop_buy_confirm(call) -> None:
     item = get_item_detail(api_client, int(item_id), telegram_id=telegram_id)
     text, markup = build_buy_confirm_message(item, category)
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "shop", "buy"))

@@ -50,17 +50,22 @@ def menu_reply_button(message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "nav", "home"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_nav_home(call) -> None:
     storage.clear_fsm_state(call.message.chat.id)
     text, markup = build_main_menu_message()
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "nav", "open"))
 @guarded_callback(bot)
 def handle_nav_open(call) -> None:
+    # Deliberately NOT answer_immediately here: most branches below delegate
+    # to another domain's OWN already-guarded handler (which answers for
+    # itself, immediately, via its own decorator) — pre-answering here too
+    # would just make every one of those a harmless-but-noisy double-answer.
+    # Only the "tourn" branch calls a bare helper instead of a guarded
+    # handler, so it answers for itself, first, right below.
     _, _, section = parse_cb(call.data)
     storage.clear_fsm_state(call.message.chat.id)
 
@@ -69,8 +74,8 @@ def handle_nav_open(call) -> None:
     elif section == "rating":
         ratings_h.handle_rating_hub_callback(call)
     elif section == "tourn":
-        tournaments_h.open_tournaments_list(call.message.chat.id, call.message.message_id)
         bot.answer_callback_query(call.id)
+        tournaments_h.open_tournaments_list(call.message.chat.id, call.message.message_id)
     elif section == "fantasy":
         fantasy_h.handle_fantasy_events(call)
     elif section == "shop":

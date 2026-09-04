@@ -32,19 +32,20 @@ def _scope_name(tournament_id: int, series_id: int) -> str:
 
 def _edit(call, text, markup):
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
-def _require_linked(call) -> bool:
+def _require_linked(call, answer: bool = True) -> bool:
     if resolve_player_id(api_client, call.from_user.id) is None:
         text, markup = build_not_linked_message()
         _edit(call, text, markup)
+        if answer:
+            bot.answer_callback_query(call.id)
         return False
     return True
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "fantasy", "events"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_fantasy_events(call) -> None:
     telegram_id = call.from_user.id
     data = get_events(api_client, telegram_id)
@@ -52,10 +53,10 @@ def handle_fantasy_events(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "fantasy", "history"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_fantasy_history(call) -> None:
     telegram_id = call.from_user.id
-    if not _require_linked(call):
+    if not _require_linked(call, answer=False):
         return
     parts = parse_cb(call.data)
     page = int(parts[2]) if len(parts) > 2 else 1
@@ -64,7 +65,7 @@ def handle_fantasy_history(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "fantasy", "open"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_fantasy_open(call) -> None:
     _, _, tournament_id, series_id, is_practice = parse_cb(call.data)
     tournament_id, series_id, is_practice = int(tournament_id), int(series_id), bool(int(is_practice))
@@ -81,11 +82,11 @@ def handle_fantasy_open(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "fantasy", "my"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_fantasy_my(call) -> None:
     _, _, tournament_id, series_id, is_practice = parse_cb(call.data)
     tournament_id, series_id, is_practice = int(tournament_id), int(series_id), bool(int(is_practice))
-    if not _require_linked(call):
+    if not _require_linked(call, answer=False):
         return
     telegram_id = call.from_user.id
     try:
@@ -117,7 +118,7 @@ def handle_fantasy_create(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "fantasy", "avail"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_fantasy_avail(call) -> None:
     _, _, tournament_id, series_id, is_practice = parse_cb(call.data)
     tournament_id, series_id, is_practice = int(tournament_id), int(series_id), bool(int(is_practice))
@@ -166,7 +167,7 @@ def handle_fantasy_unpick(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "fantasy", "cancel-confirm"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_fantasy_cancel_confirm(call) -> None:
     _, _, tournament_id, series_id, is_practice = parse_cb(call.data)
     tournament_id, series_id, is_practice = int(tournament_id), int(series_id), bool(int(is_practice))
@@ -192,7 +193,7 @@ def handle_fantasy_cancel(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "fantasy", "lb"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_fantasy_leaderboard(call) -> None:
     _, _, tournament_id, series_id, is_practice = parse_cb(call.data)
     tournament_id, series_id, is_practice = int(tournament_id), int(series_id), bool(int(is_practice))
@@ -202,7 +203,7 @@ def handle_fantasy_leaderboard(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "fantasy", "tourn"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_fantasy_tourn_shortcut(call) -> None:
     """Shortcut used by other screens (tournament detail, notifications) —
     just an alias for opening the paid hub for a whole tournament."""
@@ -220,7 +221,7 @@ def handle_fantasy_tourn_shortcut(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "fantasy", "series"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_fantasy_series_shortcut(call) -> None:
     _, _, tournament_id, series_id = parse_cb(call.data)
     tournament_id, series_id = int(tournament_id), int(series_id)

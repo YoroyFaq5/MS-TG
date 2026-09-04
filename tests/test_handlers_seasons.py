@@ -322,17 +322,22 @@ def test_handle_season_myplace_no_games_played_yet():
 # ── 8. API errors — friendly toast, not a crash ─────────────────────────────
 
 def test_handle_season_current_api_error_shows_friendly_toast_not_crash():
+    """The callback is answered immediately (before the API call — see
+    guarded_callback's answer_immediately), so an error afterward can no
+    longer put its message in the answer toast; it falls back to a plain
+    sent message instead (see dispatch.py::_report_failure)."""
     from bot.handlers.seasons import handle_season_current
 
     call = _fake_callback(cb("season", "current"))
     with patch("bot.handlers.seasons.get_current_season", side_effect=ApiError("boom")), \
          patch("bot.telegram_bot.bot.edit_message_text") as mock_edit, \
-         patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer:
+         patch("bot.telegram_bot.bot.answer_callback_query") as mock_answer, \
+         patch("bot.telegram_bot.bot.send_message") as mock_send:
         handle_season_current(call)  # must not raise
 
     mock_edit.assert_not_called()
     mock_answer.assert_called_once()
-    assert "не удалось" in mock_answer.call_args[0][1].lower()
+    assert "не удалось" in mock_send.call_args[0][1].lower()
 
 
 def test_handle_season_detail_api_error_shows_friendly_toast_not_crash():

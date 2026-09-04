@@ -19,25 +19,24 @@ logger = logging.getLogger(__name__)
 
 def _edit(call, text, markup):
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "season", "current"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_season_current(call) -> None:
     season = get_current_season(api_client)
     _edit(call, *build_season_summary_message(season))
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "season", "list"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_season_list(call) -> None:
     data = get_seasons(api_client)
     _edit(call, *build_seasons_list_message(data))
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "season", "detail"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_season_detail(call) -> None:
     _, _, season_id, page = parse_cb(call.data)
     data = get_season_detail(api_client, int(season_id), page=int(page))
@@ -45,7 +44,7 @@ def handle_season_detail(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "season", "myplace"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_season_myplace(call) -> None:
     _, _, season_id = parse_cb(call.data)
     telegram_id = call.from_user.id
@@ -58,7 +57,7 @@ def handle_season_myplace(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "season", "myplace-current"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_season_myplace_current(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -74,7 +73,7 @@ def handle_season_myplace_current(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "season", "winners"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_season_winners(call) -> None:
     _, _, page = parse_cb(call.data)
     data = get_season_winners(api_client, page=int(page))

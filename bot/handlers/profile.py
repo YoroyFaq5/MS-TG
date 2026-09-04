@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 def _edit(call, text, markup):
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 @bot.message_handler(commands=["me"])
@@ -61,7 +60,7 @@ def handle_stats(message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "profile", "open"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_profile_open(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -72,7 +71,7 @@ def handle_profile_open(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "profile", "stats"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_profile_stats(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -83,7 +82,7 @@ def handle_profile_stats(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "profile", "achievements"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_profile_achievements(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -94,7 +93,7 @@ def handle_profile_achievements(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "profile", "balance"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_profile_balance(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -106,7 +105,7 @@ def handle_profile_balance(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "profile", "account"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_profile_account(call) -> None:
     telegram_id = call.from_user.id
     data = resolve(api_client, telegram_id)

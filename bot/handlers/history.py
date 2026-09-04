@@ -37,7 +37,7 @@ def handle_history(message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "history", "list"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_history_page_callback(call) -> None:
     _, _, page = parse_cb(call.data)
     telegram_id = call.from_user.id
@@ -47,4 +47,3 @@ def handle_history_page_callback(call) -> None:
         data = get_history(api_client, telegram_id, page=int(page), per_page=10)
         text, markup = build_history_message(data)
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)

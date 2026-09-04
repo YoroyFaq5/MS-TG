@@ -18,17 +18,16 @@ def _cat(raw: str):
 
 def _edit(call, text, markup):
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "inv", "hub"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_inventory_hub(call) -> None:
     _edit(call, *build_inventory_hub_message())
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "inv", "list"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_inventory_list(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:

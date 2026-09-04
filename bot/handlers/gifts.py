@@ -35,7 +35,6 @@ MAX_NOTE_LENGTH = 200
 
 def _edit(call, text, markup):
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 def _state_step(chat_id: int, step: str) -> bool:
@@ -44,14 +43,14 @@ def _state_step(chat_id: int, step: str) -> bool:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "gift", "hub"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_gift_hub(call) -> None:
     storage.clear_fsm_state(call.message.chat.id)
     _edit(call, *build_gifts_hub_message())
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "gift", "inbox"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_gift_inbox(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -64,7 +63,7 @@ def handle_gift_inbox(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "gift", "history"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_gift_history(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -77,7 +76,7 @@ def handle_gift_history(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "gift", "send") and len(parse_cb(call.data)) == 2)
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_gift_send_start(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -89,7 +88,7 @@ def handle_gift_send_start(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "gift", "send-pick"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_gift_pick_item(call) -> None:
     telegram_id = call.from_user.id
     if resolve_player_id(api_client, telegram_id) is None:
@@ -103,7 +102,7 @@ def handle_gift_pick_item(call) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "gift", "cancel"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_gift_cancel(call) -> None:
     storage.clear_fsm_state(call.message.chat.id)
     _edit(call, *build_gifts_hub_message())
@@ -128,7 +127,7 @@ def handle_gift_recipient_text(message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "gift", "recip"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_gift_recipient_pick(call) -> None:
     state = storage.get_fsm_state(call.message.chat.id)
     if not state or state["scenario"] != SCENARIO:
@@ -143,7 +142,6 @@ def handle_gift_recipient_pick(call) -> None:
     recipient = get_player(api_client, to_player_id)
     text, markup = build_ask_note_message(recipient["display_name"])
     bot.send_message(call.message.chat.id, text, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 def _show_confirm(chat_id: int) -> None:
@@ -165,12 +163,11 @@ def _show_confirm(chat_id: int) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "gift", "skip-note"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_gift_skip_note(call) -> None:
     if not _state_step(call.message.chat.id, "await_note"):
         _edit(call, *build_gifts_hub_message())
         return
-    bot.answer_callback_query(call.id)
     _show_confirm(call.message.chat.id)
 
 
@@ -190,6 +187,7 @@ def handle_gift_confirm(call) -> None:
     state = storage.get_fsm_state(call.message.chat.id)
     if not state or state["scenario"] != SCENARIO:
         _edit(call, *build_gifts_hub_message())
+        bot.answer_callback_query(call.id)
         return
     data = state["data"]
     telegram_id = call.from_user.id

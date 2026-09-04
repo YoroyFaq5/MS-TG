@@ -38,16 +38,15 @@ def handle_tournaments(message) -> None:
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "tourn", "list"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_tournament_list_callback(call) -> None:
     _, _, status_raw, page = parse_cb(call.data)
     status = None if status_raw == "-" else status_raw
     open_tournaments_list(call.message.chat.id, call.message.message_id, status=status, page=int(page))
-    bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "tourn", "open"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_tournament_open_callback(call) -> None:
     _, _, tournament_id, series_tournament_id = parse_cb(call.data)
     tournament_id, series_tournament_id = int(tournament_id), int(series_tournament_id)
@@ -64,15 +63,13 @@ def handle_tournament_open_callback(call) -> None:
         bot.edit_message_text(
             stale_state("Турнир больше не существует."), call.message.chat.id, call.message.message_id,
         )
-        bot.answer_callback_query(call.id)
         return
 
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: is_cb(call.data, "tourn", "series-evening"))
-@guarded_callback(bot)
+@guarded_callback(bot, answer_immediately=True)
 def handle_series_evening_callback(call) -> None:
     _, _, series_tournament_id, series_id = parse_cb(call.data)
     try:
@@ -81,9 +78,7 @@ def handle_series_evening_callback(call) -> None:
         bot.edit_message_text(
             stale_state("Этот вечер больше не существует."), call.message.chat.id, call.message.message_id,
         )
-        bot.answer_callback_query(call.id)
         return
 
     text, markup = build_series_evening_message(data)
     bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=markup)
-    bot.answer_callback_query(call.id)
